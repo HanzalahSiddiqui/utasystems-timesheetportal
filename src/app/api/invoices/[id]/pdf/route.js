@@ -28,6 +28,8 @@ export async function GET(request, context) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    const origin = new URL(request.url).origin;
+
     const item = {
       ...invoice,
       invoiceNumber: invoice.invoiceNumber || "",
@@ -42,33 +44,25 @@ export async function GET(request, context) {
         invoice.employeeId?.jobTitle ||
         invoice.employeeId?.designation ||
         "-",
-      clientName:
-        invoice.clientName ||
-        invoice.clientId?.clientName ||
-        "",
-      clientEmail:
-        invoice.clientEmail ||
-        invoice.clientId?.clientEmail ||
-        "",
+      clientName: invoice.clientName || invoice.clientId?.clientName || "",
+      clientEmail: invoice.clientEmail || invoice.clientId?.clientEmail || "",
       clientAddress:
-        invoice.clientAddress ||
-        invoice.clientId?.clientAddress ||
-        "",
+        invoice.clientAddress || invoice.clientId?.clientAddress || "",
       billingDateFrom: invoice.billingDateFrom || "",
       billingDateTo: invoice.billingDateTo || "",
       professionalServiceCharges:
-        invoice.professionalServiceCharges ??
-        invoice.poAmount ??
-        0,
+        invoice.professionalServiceCharges ?? invoice.poAmount ?? 0,
       totalDue:
         invoice.totalDue ??
         invoice.professionalServiceCharges ??
         invoice.poAmount ??
         0,
+      logoLeftUrl: `${origin}/logo-left.jpeg`,
+      logoRightUrl: `${origin}/logo-right.png`,
     };
 
     const stream = await renderToStream(
-      <InvoicePdfDocument item={item} />
+      React.createElement(InvoicePdfDocument, { item })
     );
 
     const filename = `${item.invoiceNumber || "invoice"}.pdf`;
