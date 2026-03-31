@@ -1,0 +1,32 @@
+export const employees = [
+  {
+    id: 1,
+    name: "Ali Khan",
+    email: "ali@utasystems.com",
+    employeeId: "UTA-001",
+    designation: "Drive Test Engineer",
+    department: "Telecom",
+    role: "employee",
+    status: "active",
+  },
+  {
+    id: 2,
+    name: "Ahmed Raza",
+    email: "ahmed@utasystems.com",
+    employeeId: "UTA-002",
+    designation: "RF Engineer",
+    department: "Telecom",
+    role: "employee",
+    status: "active",
+  },
+  {
+    id: 3,
+    name: "Admin User",
+    email: "admin@utasystems.com",
+    employeeId: "UTA-ADMIN-001",
+    designation: "Manager",
+    department: "Management",
+    role: "admin",
+    status: "active",
+  },
+];
