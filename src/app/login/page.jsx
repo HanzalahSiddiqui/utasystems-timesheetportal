@@ -3,14 +3,13 @@
 import Image from "next/image";
 import { signIn, useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const { status } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const [callbackUrl, setCallbackUrl] = useState("/dashboard");
 
   const [form, setForm] = useState({
     email: "",
@@ -19,6 +18,11 @@ export default function LoginPage() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setCallbackUrl(params.get("callbackUrl") || "/dashboard");
+  }, []);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -44,7 +48,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace(callbackUrl || "/dashboard");
   }
 
   return (
@@ -78,19 +82,10 @@ export default function LoginPage() {
                   className="animate-fadeInUp mt-6 max-w-xl text-lg leading-8 text-white/75"
                   style={{ animationDelay: "0.3s" }}
                 >
-                  A portal for employee timesheets, approvals,
-                  monthly records, and workforce tracking designed for a
-                  smooth, secure, and professional experience.
+                  A portal for employee timesheets, approvals, monthly records,
+                  and workforce tracking designed for a smooth, secure, and
+                  professional experience.
                 </p>
-
-                <div
-                  className="animate-fadeInUp mt-10 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-3"
-                  style={{ animationDelay: "0.45s" }}
-                >
-                  {/* <FeaturePill title="Secure Login" />
-                  <FeaturePill title="Monthly Timesheets" />
-                  <FeaturePill title="Approval Workflow" /> */}
-                </div>
               </div>
             </div>
 
@@ -168,7 +163,8 @@ export default function LoginPage() {
                 </form>
 
                 <div className="mt-6 text-center text-xs text-white/50">
-                  Protected access for authorized Universal Technology Systems and Associates LLC personnel only
+                  Protected access for authorized Universal Technology Systems
+                  and Associates LLC personnel only
                 </div>
               </div>
             </div>
@@ -180,14 +176,6 @@ export default function LoginPage() {
           Reserved
         </footer>
       </div>
-    </div>
-  );
-}
-
-function FeaturePill({ title }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 text-center text-sm font-medium text-white/85 backdrop-blur-md">
-      {title}
     </div>
   );
 }
