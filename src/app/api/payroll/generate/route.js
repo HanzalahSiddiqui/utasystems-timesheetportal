@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import MonthlyTimesheet from "@/models/MonthlyTimesheet";
+import { calculatePayrollFinancials } from "@/lib/payrollCalc";
 import Payroll from "@/models/Payroll";
 
 function round2(num) {
@@ -83,7 +84,11 @@ function buildPayrollFromTimesheet(user, timesheet, month) {
   const netPay = grossPay - deductions;
 
   const poAmount = poRegularAmount + poOtAmount;
-  const margin = poAmount - grossPay;
+  const { employerTax, margin, netProfit } =
+  calculatePayrollFinancials({
+    grossPay,
+    poAmount,
+  });
 
   return {
     employeeId: user._id,
@@ -123,7 +128,9 @@ function buildPayrollFromTimesheet(user, timesheet, month) {
     poOtAmount: round2(poOtAmount),
     poAmount: round2(poAmount),
 
-    margin: round2(margin),
+    employerTax: round2(employerTax),
+margin: round2(margin),
+netProfit: round2(netProfit), 
 
     status: "draft",
     generatedAt: new Date(),

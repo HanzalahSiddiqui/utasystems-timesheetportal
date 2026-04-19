@@ -176,17 +176,21 @@ export default function AdminPayrollPage() {
         acc.totalEmployees += 1;
         acc.totalGross += Number(item.grossPay || 0);
         acc.totalPo += Number(item.poAmount || 0);
+        acc.totalEmployerTax += Number(item.employerTax || 0);
+        acc.totalNetProfit += Number(item.netProfit || 0);
         acc.totalMargin += Number(item.margin || 0);
         acc.totalNet += Number(item.netPay || 0);
         return acc;
       },
-      {
-        totalEmployees: 0,
-        totalGross: 0,
-        totalPo: 0,
-        totalMargin: 0,
-        totalNet: 0,
-      }
+     {
+  totalEmployees: 0,
+  totalGross: 0,
+  totalPo: 0,
+  totalMargin: 0,
+  totalNet: 0,
+  totalEmployerTax: 0,
+  totalNetProfit: 0,
+}
     );
   }, [filteredItems]);
 
@@ -243,12 +247,18 @@ export default function AdminPayrollPage() {
             </div>
             
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
               <SummaryCard title="Employees" value={summary.totalEmployees} />
               <SummaryCard title="Gross Salary" value={summary.totalGross.toFixed(2)} />
               <SummaryCard title="PO Amount" value={summary.totalPo.toFixed(2)} />
               <SummaryCard title="Margin" value={summary.totalMargin.toFixed(2)} />
               <SummaryCard title="Net Payroll" value={summary.totalNet.toFixed(2)} />
+              <SummaryCard title="Employer Tax (7.65%)" value={summary.totalEmployerTax.toFixed(2)} />
+
+<SummaryCard
+  title="Net Profit"
+  value={summary.totalNetProfit.toFixed(2)}
+/>
             </div>
 
             <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
@@ -326,7 +336,7 @@ export default function AdminPayrollPage() {
 
               <div className="overflow-hidden rounded-2xl border border-slate-200">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1300px] w-full">
+                  <table className="min-w-[1500px] w-full">
                     <thead className="bg-slate-900 text-white">
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Employee</th>
@@ -340,6 +350,8 @@ export default function AdminPayrollPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold">PO Amount</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Margin</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Net Pay</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Employer Tax</th>
+<th className="px-4 py-3 text-left text-sm font-semibold">Net Profit</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                       </tr>
@@ -391,6 +403,11 @@ export default function AdminPayrollPage() {
                             </td>
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
                               {item.netPay}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-red-600 font-semibold">
+                              {item.employerTax}</td>
+                            <td className="px-4 py-4 text-sm font-semibold text-emerald-700">
+                              {item.netProfit}
                             </td>
                             <td className="px-4 py-4">
                               <StatusBadge status={item.status} />
@@ -475,7 +492,7 @@ export default function AdminPayrollPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="13" className="px-4 py-10 text-center text-slate-500">
+                          <td colSpan="15" className="px-4 py-10 text-center text-slate-500">
                             No payroll records found
                           </td>
                         </tr>

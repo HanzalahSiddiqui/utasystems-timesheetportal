@@ -14,7 +14,7 @@ export default function Sidebar({
     { name: "Dashboard", href: "/dashboard/employee" },
     { name: "Get Timesheet", href: "/dashboard/employee/get-timesheet" },
     { name: "My Timesheets", href: "/dashboard/employee/my-timesheets" },
-    { name: "Expenses", href: "/dashboard/employee/expenses" },
+    // { name: "Expenses", href: "/dashboard/employee/expenses" },
   ];
 
 const adminLinks = [

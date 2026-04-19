@@ -2,7 +2,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Payroll from "@/models/Payroll";
+import { calculatePayrollFinancials } from "@/lib/payrollCalc";
 import mongoose from "mongoose";
+
 
 function round2(num) {
   return Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
@@ -143,21 +145,24 @@ export async function PATCH(req, context) {
 
     /* ---------- Recalculate Payroll ---------- */
 
-    item.grossPay = round2(
-      Number(item.regularPay || 0) +
-      Number(item.otPay || 0) +
-      Number(item.allowances || 0)
-    );
+item.grossPay = round2(
+  Number(item.regularPay || 0) +
+  Number(item.otPay || 0) +
+  Number(item.allowances || 0)
+);
 
-    item.netPay = round2(
-      Number(item.grossPay || 0) -
-      Number(item.deductions || 0)
-    );
+item.netPay = round2(
+  Number(item.grossPay || 0) -
+  Number(item.deductions || 0)
+);
 
-    item.margin = round2(
-      Number(item.poAmount || 0) -
-      Number(item.grossPay || 0)
-    );
+// NEW FINANCIAL CALCULATION
+const { employerTax, margin, netProfit } =
+  calculatePayrollFinancials(item);
+
+item.employerTax = employerTax;
+item.margin = margin;
+item.netProfit = netProfit;
 
     await item.save();
 

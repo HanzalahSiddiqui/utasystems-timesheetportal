@@ -77,6 +77,8 @@ export async function GET(req) {
       "PO OT Amount",
       "PO Amount",
       "Margin",
+      "Employer Tax",
+"Net Profit",
       "Status",
       "Remarks",
       "Generated At",
@@ -113,6 +115,9 @@ export async function GET(req) {
       item.poOtAmount ?? 0,
       item.poAmount ?? 0,
       item.margin ?? 0,
+      item.employerTax ?? 0,
+item.netProfit ?? 0,
+      
       item.status || "",
       item.remarks || "",
       item.generatedAt ? new Date(item.generatedAt).toISOString() : "",

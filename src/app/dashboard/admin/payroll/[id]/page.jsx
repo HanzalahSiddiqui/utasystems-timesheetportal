@@ -325,6 +325,16 @@ export default function PayrollDetailPage() {
                       <InfoCard title="Deductions" value={item.deductions} />
                       <InfoCard title="Net Pay" value={item.netPay} />
                       <InfoCard title="Margin" value={item.margin} />
+                      <InfoCard
+  title="Employer Tax (7.65%)"
+  value={item.employerTax}
+/>
+
+<InfoCard
+  title="Net Profit"
+  value={item.netProfit}
+  subtitle="After tax"
+/>
                     </div>
                   </div>
 

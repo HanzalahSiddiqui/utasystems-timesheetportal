@@ -125,6 +125,7 @@ const PayrollSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    
     deductions: {
       type: Number,
       default: 0,
@@ -162,12 +163,21 @@ const PayrollSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+employerTax: {
+  type: Number,
+  default: 0,
+},
 
+netProfit: {
+  type: Number,
+  default: 0,
+},
     status: {
       type: String,
       enum: ["draft", "finalized", "paid"],
       default: "draft",
     },
+    
     remarks: {
       type: String,
       default: "",
