@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
-import ExpenseForm from "@/components/ExpenseForm";
+import ExpenseFormEmployee from "@/components/ExpenseFormEmployee";
 import ExpenseList from "@/components/ExpenseList";
 
 export default function EmployeeExpensesPage() {
@@ -64,7 +64,7 @@ export default function EmployeeExpensesPage() {
               </p>
             </div>
 
-            <ExpenseForm onSaved={loadItems} />
+            <ExpenseFormEmployee onSaved={loadItems} />
 
             {loading ? (
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">

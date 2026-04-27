@@ -1,34 +1,20 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
-export default function Navbar({
-  user = "User",
-  onMenuClick = () => {},
-}) {
+export default function Navbar({ onMenuClick = () => {} }) {
+  const { data: session } = useSession();
+
   return (
     <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
+
         <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={onMenuClick}
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
-            aria-label="Open menu"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
+            ☰
           </button>
 
           <div className="min-w-0">
@@ -41,9 +27,12 @@ export default function Navbar({
           </div>
         </div>
 
+        {/* 🔥 SESSION BASED USER */}
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <span className="hidden text-sm text-slate-600 md:inline">
-            {user}
+            {session?.user?.name || "User"}
+            {" "}
+            ({session?.user?.role})
           </span>
 
           <button
@@ -53,6 +42,7 @@ export default function Navbar({
             Logout
           </button>
         </div>
+
       </div>
     </div>
   );

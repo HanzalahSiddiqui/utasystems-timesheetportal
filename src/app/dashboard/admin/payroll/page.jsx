@@ -349,6 +349,8 @@ export default function AdminPayrollPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold">Gross Salary</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">PO Amount</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Margin</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Employee Expense</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Real Profit</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Net Pay</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Employer Tax</th>
 <th className="px-4 py-3 text-left text-sm font-semibold">Net Profit</th>
@@ -398,12 +400,21 @@ export default function AdminPayrollPage() {
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
                               {item.poAmount}
                             </td>
-                            <td className="px-4 py-4 text-sm font-semibold text-emerald-700">
-                              {item.margin}
-                            </td>
-                            <td className="px-4 py-4 text-sm font-semibold text-slate-900">
-                              {item.netPay}
-                            </td>
+                           <td className="px-4 py-4 text-sm font-semibold text-emerald-700">
+  {item.margin}
+</td>
+
+<td className="px-4 py-4 text-sm font-semibold text-red-600">
+  {item.employeeExpense || 0}
+</td>
+
+<td className="px-4 py-4 text-sm font-semibold text-green-700">
+  {item.realProfit || 0}
+</td>
+
+<td className="px-4 py-4 text-sm font-semibold text-slate-900">
+  {item.netPay}
+</td>
                             <td className="px-4 py-4 text-sm text-red-600 font-semibold">
                               {item.employerTax}</td>
                             <td className="px-4 py-4 text-sm font-semibold text-emerald-700">

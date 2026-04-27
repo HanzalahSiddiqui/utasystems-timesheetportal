@@ -194,6 +194,8 @@ netProfit: {
       type: Date,
       default: null,
     },
+    employeeExpense: { type: Number, default: 0 },
+realProfit: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

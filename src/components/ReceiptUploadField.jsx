@@ -5,25 +5,44 @@ import { useRef, useState } from "react";
 export default function ReceiptUploadField({
   value = "",
   onChange = () => {},
-  label = "Receipt Picture",
+  label = "Receipt",
 }) {
   const inputRef = useRef(null);
   const [fileName, setFileName] = useState("");
+  const [uploading, setUploading] = useState(false);
 
-  function handleFileChange(e) {
+  async function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
+    setUploading(true);
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      onChange({
-        receiptUrl: String(reader.result || ""),
-        receiptFileName: file.name,
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
-    };
-    reader.readAsDataURL(file);
+
+      const data = await res.json();
+
+      if (data.url) {
+        onChange({
+          receiptUrl: data.url,            // ✅ Cloudinary URL
+          receiptFileName: data.name,
+        });
+      } else {
+        alert("Upload failed");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Upload error");
+    }
+
+    setUploading(false);
   }
 
   return (
@@ -35,25 +54,38 @@ export default function ReceiptUploadField({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,.pdf"
         onChange={handleFileChange}
         className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
       />
 
-      {fileName ? (
-        <p className="mt-2 text-xs text-slate-500">{fileName}</p>
-      ) : null}
+      {uploading && (
+        <p className="mt-2 text-xs text-blue-600">Uploading...</p>
+      )}
 
-      {value ? (
-        <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-          <img
-            src={value}
-            alt="Receipt preview"
-            className="max-h-72 w-full object-contain bg-slate-50"
-          />
+      {fileName && (
+        <p className="mt-2 text-xs text-slate-500">{fileName}</p>
+      )}
+
+      {value && (
+        <div className="mt-3">
+          {value.includes(".pdf") ? (
+            <a
+              href={value}
+              target="_blank"
+              className="text-blue-600 underline"
+            >
+              View Uploaded PDF
+            </a>
+          ) : (
+            <img
+              src={value}
+              alt="Receipt preview"
+              className="max-h-72 w-full object-contain bg-slate-50 rounded"
+            />
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

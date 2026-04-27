@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import MonthlyTimesheet from "@/models/MonthlyTimesheet";
 import { calculatePayrollFinancials } from "@/lib/payrollCalc";
 import Payroll from "@/models/Payroll";
+import Expense from "@/models/Expense";
 
 function round2(num) {
   return Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
@@ -178,6 +179,32 @@ export async function POST(req) {
       if (user.payrollEnabled === false) continue;
 
       const payload = buildPayrollFromTimesheet(user, timesheet, month);
+      // ---------- EXPENSE CALCULATION ----------
+
+const start = new Date(`${month}-01`);
+const end = new Date(start);
+end.setMonth(end.getMonth() + 1);
+
+const expenses = await Expense.find({
+  employeeId: user._id,
+  status: "approved",
+  $or: [
+    { expenseDate: { $gte: start, $lt: end } },
+    { expenseDate: { $exists: false }, createdAt: { $gte: start, $lt: end } }
+  ]
+});
+
+const employeeExpense = expenses.reduce(
+  (sum, e) => sum + Number(e.amount || 0),
+  0
+);
+
+// ---------- REAL PROFIT ----------
+
+const realProfit = Number(payload.margin || 0) - employeeExpense;
+
+payload.employeeExpense = Math.round(employeeExpense * 100) / 100;
+payload.realProfit = Math.round(realProfit * 100) / 100;
 
       const existing = await Payroll.findOne({
         employeeId: user._id,

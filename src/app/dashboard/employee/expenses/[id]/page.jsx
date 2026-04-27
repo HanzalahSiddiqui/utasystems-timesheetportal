@@ -103,15 +103,36 @@ export default function EmployeeExpenseDetailPage() {
                 Receipt
               </h2>
 
-              {item.receiptUrl ? (
-                <img
-                  src={item.receiptUrl}
-                  alt="Receipt"
-                  className="max-h-[700px] w-full rounded-2xl object-contain bg-slate-50"
-                />
-              ) : (
-                <p className="text-slate-500">No receipt available</p>
-              )}
+            {item.receiptUrl ? (
+  <div className="space-y-4">
+
+    {/* 🔹 Button */}
+    <a
+      href={item.receiptUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+    >
+      View / Download Receipt
+    </a>
+
+    {/* 🔹 Preview */}
+    {item.receiptUrl.endsWith(".pdf") ? (
+      <iframe
+        src={item.receiptUrl}
+        className="w-full h-[600px] rounded-2xl border"
+      />
+    ) : (
+      <img
+        src={item.receiptUrl}
+        alt="Receipt"
+        className="max-h-[700px] w-full rounded-2xl object-contain bg-slate-50"
+      />
+    )}
+  </div>
+) : (
+  <p className="text-slate-500">No receipt available</p>
+)}
             </div>
           </div>
         </div>

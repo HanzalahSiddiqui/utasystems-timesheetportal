@@ -5,7 +5,7 @@ const ExpenseSchema = new mongoose.Schema(
     employeeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false, // ✅ allow company expense
     },
 
     employeeName: {
@@ -16,6 +16,17 @@ const ExpenseSchema = new mongoose.Schema(
     employeeCode: {
       type: String,
       default: "",
+    },
+
+    expenseOwnerType: {
+      type: String,
+      enum: ["employee", "company"],
+      default: "employee",
+    },
+
+    category: {
+      type: String,
+      default: "Other",
     },
 
     expenseType: {
@@ -52,9 +63,10 @@ const ExpenseSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // ✅ FIX: NOT required anymore
     receiptUrl: {
       type: String,
-      required: true,
+      default: "",
     },
 
     receiptFileName: {
@@ -63,9 +75,10 @@ const ExpenseSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // ✅ FIX: NOT required anymore
     incurredByName: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
     },
 
@@ -80,6 +93,11 @@ const ExpenseSchema = new mongoose.Schema(
       enum: ["employee", "company"],
       required: true,
       default: "employee",
+    },
+
+    expenseDate: {
+      type: Date,
+      required: false,
     },
 
     status: {
@@ -125,6 +143,24 @@ const ExpenseSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    evidence: [
+  {
+    url: { type: String, required: true },
+    fileName: { type: String, default: "" },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    uploadedByRole: {
+      type: String,
+      enum: ["admin", "employee"],
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+],
   },
   { timestamps: true }
 );

@@ -4,14 +4,20 @@ import { connectDB } from "@/lib/mongodb";
 import Expense from "@/models/Expense";
 import mongoose from "mongoose";
 
+/* ================================
+   🔹 VALIDATION (UPDATED)
+================================ */
+
 function isValidReceipt(value) {
   if (!value || typeof value !== "string") return false;
-  return (
-    value.startsWith("data:image/") ||
-    value.startsWith("https://") ||
-    value.startsWith("http://")
-  );
+
+  // ✅ ONLY allow Cloudinary URLs
+  return value.startsWith("https://res.cloudinary.com/");
 }
+
+/* ================================
+   🔹 GET
+================================ */
 
 export async function GET(req, context) {
   try {
@@ -21,7 +27,7 @@ export async function GET(req, context) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await context.params;
+   const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return Response.json({ error: "Invalid expense ID" }, { status: 400 });
@@ -46,6 +52,7 @@ export async function GET(req, context) {
     }
 
     return Response.json({ item });
+
   } catch (error) {
     console.error("GET /api/expenses/[id] error:", error);
     return Response.json(
@@ -55,6 +62,10 @@ export async function GET(req, context) {
   }
 }
 
+/* ================================
+   🔹 PATCH (UPDATED)
+================================ */
+
 export async function PATCH(req, context) {
   try {
     const session = await getServerSession(authOptions);
@@ -63,7 +74,7 @@ export async function PATCH(req, context) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await context.params;
+    const { id } = context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return Response.json({ error: "Invalid expense ID" }, { status: 400 });
@@ -85,6 +96,10 @@ export async function PATCH(req, context) {
     if (!isOwner && !isAdmin) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    /* ================================
+       🔹 EMPLOYEE UPDATE FLOW
+    ================================= */
 
     if (!isAdmin) {
       if (!["draft", "submitted", "rejected"].includes(item.status)) {
@@ -121,14 +136,15 @@ export async function PATCH(req, context) {
         item.description = String(description || "").trim();
       }
 
+      // ✅ RECEIPT FIX
       if (receiptUrl !== undefined) {
         if (!receiptUrl) {
           return Response.json({ error: "Receipt is required" }, { status: 400 });
         }
         if (!isValidReceipt(receiptUrl)) {
-          return Response.json({ error: "Invalid receipt format" }, { status: 400 });
+          return Response.json({ error: "Only Cloudinary URL allowed" }, { status: 400 });
         }
-        item.receiptUrl = String(receiptUrl);
+        item.receiptUrl = receiptUrl;
       }
 
       if (receiptFileName !== undefined) {
@@ -150,7 +166,7 @@ export async function PATCH(req, context) {
       if (submit === true) {
         if (!item.receiptUrl) {
           return Response.json(
-            { error: "Receipt is required before submitting expense claim" },
+            { error: "Receipt required before submission" },
             { status: 400 }
           );
         }
@@ -162,10 +178,14 @@ export async function PATCH(req, context) {
       await item.save();
 
       return Response.json({
-        message: submit === true ? "Expense submitted successfully" : "Expense updated successfully",
+        message: submit ? "Expense submitted" : "Expense updated",
         item,
       });
     }
+
+    /* ================================
+       🔹 ADMIN UPDATE FLOW
+    ================================= */
 
     const {
       expenseType,
@@ -195,14 +215,15 @@ export async function PATCH(req, context) {
       item.description = String(description || "").trim();
     }
 
+    // ✅ RECEIPT FIX
     if (receiptUrl !== undefined) {
       if (!receiptUrl) {
-        return Response.json({ error: "Receipt is required" }, { status: 400 });
+        return Response.json({ error: "Receipt required" }, { status: 400 });
       }
       if (!isValidReceipt(receiptUrl)) {
-        return Response.json({ error: "Invalid receipt format" }, { status: 400 });
+        return Response.json({ error: "Only Cloudinary URL allowed" }, { status: 400 });
       }
-      item.receiptUrl = String(receiptUrl);
+      item.receiptUrl = receiptUrl;
     }
 
     if (receiptFileName !== undefined) {
@@ -227,7 +248,7 @@ export async function PATCH(req, context) {
 
     if (status !== undefined) {
       if (!["draft", "submitted", "approved", "rejected", "paid"].includes(status)) {
-        return Response.json({ error: "Invalid expense status" }, { status: 400 });
+        return Response.json({ error: "Invalid status" }, { status: 400 });
       }
 
       item.status = status;
@@ -259,11 +280,42 @@ export async function PATCH(req, context) {
       message: "Expense updated successfully",
       item,
     });
+
   } catch (error) {
-    console.error("PATCH /api/expenses/[id] error:", error);
+    console.error("PATCH error:", error);
     return Response.json(
       { error: error.message || "Failed to update expense" },
       { status: 500 }
     );
+  }
+}
+
+/* ================================
+   🔹 DELETE (UNCHANGED)
+================================ */
+
+export async function DELETE(req, context) {
+  try {
+    await connectDB();
+
+    const { id } = await context.params;
+
+    console.log("DELETE ID:", id); // 🔍 debug
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return Response.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    const deleted = await Expense.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return Response.json({ error: "Expense not found" }, { status: 404 });
+    }
+
+    return Response.json({ message: "Deleted successfully" });
+
+  } catch (error) {
+    console.error("DELETE ERROR:", error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

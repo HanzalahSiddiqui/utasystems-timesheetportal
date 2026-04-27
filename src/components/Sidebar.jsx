@@ -14,7 +14,7 @@ export default function Sidebar({
     { name: "Dashboard", href: "/dashboard/employee" },
     { name: "Get Timesheet", href: "/dashboard/employee/get-timesheet" },
     { name: "My Timesheets", href: "/dashboard/employee/my-timesheets" },
-    // { name: "Expenses", href: "/dashboard/employee/expenses" },
+    { name: "Expenses", href: "/dashboard/employee/expenses" },
   ];
 
 const adminLinks = [
@@ -26,6 +26,7 @@ const adminLinks = [
   {name: "Invoices", href: "/dashboard/admin/invoices"},
   { name: "Holidays", href: "/dashboard/admin/holidays" },
   { name: "Expenses", href: "/dashboard/admin/expenses" },
+  // { name: "Profit Analytics", href: "/dashboard/admin/profit-analytics" }
 ];
 
   const links = role === "admin" ? adminLinks : employeeLinks;

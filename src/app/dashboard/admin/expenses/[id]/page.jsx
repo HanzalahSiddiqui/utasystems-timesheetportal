@@ -73,8 +73,10 @@ export default function AdminExpenseDetailPage() {
   }
 
   useEffect(() => {
-    if (params?.id) loadItem();
-  }, [params?.id]);
+  if (!params?.id) return;
+
+  loadItem();
+}, [params]);
 
   async function saveChanges(e) {
     e.preventDefault();
@@ -223,15 +225,37 @@ export default function AdminExpenseDetailPage() {
                   Receipt
                 </h2>
 
-                {form.receiptUrl ? (
-                  <img
-                    src={form.receiptUrl}
-                    alt="Receipt"
-                    className="max-h-[900px] w-full rounded-2xl object-contain bg-slate-50"
-                  />
-                ) : (
-                  <p className="text-slate-500">No receipt available</p>
-                )}
+        {form.receiptUrl ? (
+  <div className="space-y-4">
+
+    {/* 🔹 Button */}
+    <a
+      href={form.receiptUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+    >
+      View / Download Receipt
+    </a>
+
+    {/* 🔹 Preview */}
+    {form.receiptUrl.toLowerCase().endsWith(".pdf") ? (
+      <iframe
+        src={form.receiptUrl}
+        className="w-full h-[600px] rounded-2xl border"
+      />
+    ) : (
+      <img
+        src={form.receiptUrl}
+        alt="Receipt"
+        className="max-h-[700px] w-full rounded-2xl object-contain bg-slate-50"
+      />
+    )}
+
+  </div>
+) : (
+  <p className="text-slate-500">No receipt available</p>
+)}
               </div>
 
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
