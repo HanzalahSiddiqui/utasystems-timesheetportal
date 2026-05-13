@@ -33,6 +33,8 @@ export async function PATCH(req, context) {
       perDayRate,
       perHourRate,
       otRatePerHour,
+      annualGrossSalary,
+monthlyGrossSalary,
       clientPerDayRate,
       clientPerHourRate,
       clientOtRatePerHour,
@@ -125,6 +127,13 @@ export async function PATCH(req, context) {
     if (perDayRate !== undefined) employee.perDayRate = Number(perDayRate);
     if (perHourRate !== undefined) employee.perHourRate = Number(perHourRate);
     if (otRatePerHour !== undefined) employee.otRatePerHour = Number(otRatePerHour);
+    if (annualGrossSalary !== undefined) {
+  employee.annualGrossSalary = Number(annualGrossSalary);
+}
+
+if (monthlyGrossSalary !== undefined) {
+  employee.monthlyGrossSalary = Number(monthlyGrossSalary);
+}
 
     if (clientPerDayRate !== undefined) employee.clientPerDayRate = Number(clientPerDayRate);
     if (clientPerHourRate !== undefined) employee.clientPerHourRate = Number(clientPerHourRate);

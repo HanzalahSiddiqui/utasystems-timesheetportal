@@ -346,7 +346,14 @@ export default function AdminPayrollPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold">Present Days</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Regular Hours</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">OT Hours</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Gross Salary</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Gross Calculated Salary</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">
+  Annual Gross
+</th>
+
+<th className="px-4 py-3 text-left text-sm font-semibold">
+  Monthly Gross
+</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">PO Amount</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Margin</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Employee Expense</th>
@@ -397,6 +404,13 @@ export default function AdminPayrollPage() {
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
                               {item.grossPay}
                             </td>
+                            <td className="px-4 py-4 text-sm font-semibold text-slate-900">
+  {Number(item.annualGrossSalary || 0).toLocaleString()}
+</td>
+
+<td className="px-4 py-4 text-sm font-semibold text-slate-900">
+  {Number(item.monthlyGrossSalary || 0).toLocaleString()}
+</td>
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
                               {item.poAmount}
                             </td>

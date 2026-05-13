@@ -47,6 +47,7 @@ export async function POST(req) {
       clientPerHourRate,
       clientOtRatePerHour,
       payrollEnabled,
+      annualGrossSalary,
     } = body;
 
     if (!name || !email || !password || !employeeId || !payType) {
@@ -116,6 +117,12 @@ export async function POST(req) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const annualSalary = Number(annualGrossSalary || 0);
+
+const monthlySalary =
+  annualSalary > 0
+    ? Number((annualSalary / 12).toFixed(2))
+    : 0;
 
     const user = await User.create({
       name,
@@ -138,6 +145,8 @@ export async function POST(req) {
       clientOtRatePerHour: Number(clientOtRatePerHour || 0),
 
       payrollEnabled: payrollEnabled !== undefined ? !!payrollEnabled : true,
+      annualGrossSalary: annualSalary,
+monthlyGrossSalary: monthlySalary,
     });
 
     return Response.json({

@@ -131,9 +131,20 @@ const [form, setForm] = useState({
   clientPerHourRate: employee.clientPerHourRate ?? "",
   clientOtRatePerHour: employee.clientOtRatePerHour ?? "",
   payrollEnabled: employee.payrollEnabled ?? true,
+  annualGrossSalary: employee.annualGrossSalary ?? "",
+monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
 });
 
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+  const annual = Number(form.annualGrossSalary || 0);
+
+  setForm((prev) => ({
+    ...prev,
+    monthlyGrossSalary:
+      annual > 0 ? (annual / 12).toFixed(2) : "",
+  }));
+}, [form.annualGrossSalary]);
   const [message, setMessage] = useState("");
 
   async function handleSubmit(e) {
@@ -166,6 +177,14 @@ const [form, setForm] = useState({
           form.clientOtRatePerHour !== ""
             ? Number(form.clientOtRatePerHour)
             : 0,
+            annualGrossSalary:
+  form.annualGrossSalary !== ""
+    ? Number(form.annualGrossSalary)
+    : 0,
+    monthlyGrossSalary:
+  form.monthlyGrossSalary !== ""
+    ? Number(form.monthlyGrossSalary)
+    : 0,
       };
 
       const res = await fetch(`/api/employees/${employee._id}`, {
@@ -334,6 +353,31 @@ const [form, setForm] = useState({
                   </Field>
                 )}
 
+<Field label="Annual Gross Salary">
+  <Input
+    type="number"
+    min="0"
+    step="0.01"
+    value={form.annualGrossSalary}
+    onChange={(e) =>
+      setForm({
+        ...form,
+        annualGrossSalary: e.target.value,
+      })
+    }
+    placeholder="76000"
+  />
+</Field>
+
+<Field label="Monthly Gross Salary">
+  <Input
+    type="text"
+    value={form.monthlyGrossSalary}
+    disabled
+    placeholder="Auto Calculated"
+  />
+</Field>
+
                 <Field label="Employee OT Rate">
                   <Input
                     type="number"
@@ -469,6 +513,15 @@ function EmployeeMobileCard({ emp, onEdit, onToggleStatus, onDelete }) {
           }
         />
         <InfoPair label="PO OT" value={emp.clientOtRatePerHour ?? 0} />
+        <InfoPair
+  label="Annual Gross"
+  value={Number(emp.annualGrossSalary || 0).toLocaleString()}
+/>
+
+<InfoPair
+  label="Monthly Gross"
+  value={Number(emp.monthlyGrossSalary || 0).toLocaleString()}
+/>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -570,7 +623,29 @@ function EmployeeDesktopRow({ emp, onEdit, onToggleStatus, onDelete }) {
           <p className="text-xs text-slate-500">PO OT</p>
         </div>
       </td>
+      <td className="px-4 py-4 align-top text-sm text-slate-700">
+  <div className="min-w-[120px]">
+    <p className="font-medium text-slate-900">
+      {Number(emp.annualGrossSalary || 0).toLocaleString()}
+    </p>
 
+    <p className="text-xs text-slate-500">
+      Annual
+    </p>
+  </div>
+</td>
+
+<td className="px-4 py-4 align-top text-sm text-slate-700">
+  <div className="min-w-[120px]">
+    <p className="font-medium text-slate-900">
+      {Number(emp.monthlyGrossSalary || 0).toLocaleString()}
+    </p>
+
+    <p className="text-xs text-slate-500">
+      Monthly
+    </p>
+  </div>
+</td>
       <td className="px-4 py-4 align-top whitespace-nowrap">
         <PayrollBadge enabled={emp.payrollEnabled !== false} />
       </td>
@@ -632,6 +707,8 @@ export default function EmployeesPage() {
     clientPerDayRate: "",
     clientPerHourRate: "",
     clientOtRatePerHour: "",
+    annualGrossSalary: "",
+monthlyGrossSalary: "",
     payrollEnabled: true,
     clientId: "",
   });
@@ -750,7 +827,9 @@ export default function EmployeesPage() {
         clientPerDayRate: "",
         clientPerHourRate: "",
         clientOtRatePerHour: "",
-        payrollEnabled: true,
+annualGrossSalary: "",
+monthlyGrossSalary: "",
+payrollEnabled: true,
       });
 
       await loadEmployees();
@@ -845,6 +924,15 @@ export default function EmployeesPage() {
     });
   }, [employees, search]);
 
+useEffect(() => {
+  const annual = Number(form.annualGrossSalary || 0);
+
+  setForm((prev) => ({
+    ...prev,
+    monthlyGrossSalary:
+      annual > 0 ? (annual / 12).toFixed(2) : "",
+  }));
+}, [form.annualGrossSalary]);
   const activeEmployees = employees.filter((e) => e.status === "active").length;
   const inactiveEmployees = employees.filter((e) => e.status === "inactive").length;
 
@@ -863,7 +951,7 @@ export default function EmployeesPage() {
     onMenuClick={() => setSidebarOpen(true)}
   />
 
-          <div className="mx-auto w-full max-w-[1700px] p-4 sm:p-6 space-y-6">
+          <div className="mx-auto w-full max-w-[1900px] p-4 sm:p-6 space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
@@ -890,394 +978,463 @@ export default function EmployeesPage() {
               <StatCard title="Inactive Employees" value={inactiveEmployees} />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[430px_minmax(0,1fr)] 2xl:grid-cols-[500px_minmax(0,1fr)]">
-              <div className="self-start rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200 xl:sticky xl:top-6">
-                <div className="mb-5">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Add New Employee
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Create a new employee account with payroll and PO rate setup.
-                  </p>
-                </div>
+         
+<div className="space-y-6">
 
-                <form onSubmit={createEmployee} className="space-y-4">
-                  <Field label="Full Name">
-                    <Input
-                      type="text"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      required
-                    />
-                  </Field>
+  <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200 min-w-0">
+    <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900">
+          Employees Directory
+        </h2>
 
-                  <Field label="Email Address">
-                    <Input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      required
-                    />
-                  </Field>
+        <p className="mt-1 text-sm text-slate-500">
+          Search and manage all registered employees.
+        </p>
+      </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Password">
-                      <Input
-                        type="text"
-                        value={form.password}
-                        onChange={(e) =>
-                          setForm({ ...form, password: e.target.value })
-                        }
-                        required
-                      />
-                    </Field>
+      <div className="w-full xl:w-[340px]">
+        <Input
+          type="text"
+          placeholder="Search by name, email, ID, department..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+    </div>
 
-                    <Field label="Employee ID">
-                      <Input
-                        type="text"
-                        value={form.employeeId}
-                        onChange={(e) =>
-                          setForm({ ...form, employeeId: e.target.value })
-                        }
-                        required
-                      />
-                    </Field>
-                  </div>
+    <div className="block lg:hidden space-y-4">
+      {pageLoading ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500">
+          Loading employees...
+        </div>
+      ) : filteredEmployees.length > 0 ? (
+        filteredEmployees.map((emp) => (
+          <EmployeeMobileCard
+            key={emp._id}
+            emp={emp}
+            onEdit={setEditingEmployee}
+            onToggleStatus={toggleStatus}
+            onDelete={deleteEmployee}
+          />
+        ))
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500">
+          No employees found
+        </div>
+      )}
+    </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Designation">
-                      <Input
-                        type="text"
-                        value={form.designation}
-                        onChange={(e) =>
-                          setForm({ ...form, designation: e.target.value })
-                        }
-                      />
-                    </Field>
+    <div className="hidden lg:block overflow-hidden rounded-2xl border border-slate-200">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-slate-900 text-white">
+            <tr>
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Employee
+              </th>
 
-                    <Field label="Department">
-                      <Input
-                        type="text"
-                        value={form.department}
-                        onChange={(e) =>
-                          setForm({ ...form, department: e.target.value })
-                        }
-                      />
-                    </Field>
-                    <Field label="Client">
-  <Select
-    value={form.clientId}
-    onChange={(e) => setForm({ ...form, clientId: e.target.value })}
-  >
-    <option value="">Select Client</option>
-    {clients
-      .filter((client) => client.status === "active")
-      .map((client) => (
-        <option key={client._id} value={client._id}>
-          {client.clientName}
-        </option>
-      ))}
-  </Select>
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Employee ID
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Designation
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Department
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Client
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Pay Type
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Employee Rate
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Emp. OT
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                PO Rate
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                PO OT
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+  Annual Gross
+</th>
+
+<th className="px-4 py-4 text-left text-sm font-semibold">
+  Monthly Gross
+</th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Payroll
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Status
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Actions
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="bg-white">
+            {pageLoading ? (
+              <tr>
+                <td
+                  colSpan="12"
+                  className="px-4 py-10 text-center text-slate-500"
+                >
+                  Loading employees...
+                </td>
+              </tr>
+            ) : filteredEmployees.length > 0 ? (
+              filteredEmployees.map((emp) => (
+                <EmployeeDesktopRow
+                  key={emp._id}
+                  emp={emp}
+                  onEdit={setEditingEmployee}
+                  onToggleStatus={toggleStatus}
+                  onDelete={deleteEmployee}
+                />
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan="12"
+                  className="px-4 py-10 text-center text-slate-500"
+                >
+                  No employees found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p className="mt-3 hidden lg:block text-xs text-slate-400">
+      Scroll horizontally to view all payroll and PO-related columns.
+    </p>
+  </div>
+
+  <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
+    <div className="mb-5">
+      <h2 className="text-xl font-semibold text-slate-900">
+        Add New Employee
+      </h2>
+
+      <p className="mt-1 text-sm text-slate-500">
+        Create a new employee account with payroll and PO rate setup.
+      </p>
+    </div>
+
+    <form onSubmit={createEmployee} className="space-y-4">
+      <Field label="Full Name">
+        <Input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
+      </Field>
+
+      <Field label="Email Address">
+        <Input
+          type="email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          required
+        />
+      </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Password">
+          <Input
+            type="text"
+            value={form.password}
+            onChange={(e) =>
+              setForm({ ...form, password: e.target.value })
+            }
+            required
+          />
+        </Field>
+
+        <Field label="Employee ID">
+          <Input
+            type="text"
+            value={form.employeeId}
+            onChange={(e) =>
+              setForm({ ...form, employeeId: e.target.value })
+            }
+            required
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Designation">
+          <Input
+            type="text"
+            value={form.designation}
+            onChange={(e) =>
+              setForm({ ...form, designation: e.target.value })
+            }
+          />
+        </Field>
+
+        <Field label="Department">
+          <Input
+            type="text"
+            value={form.department}
+            onChange={(e) =>
+              setForm({ ...form, department: e.target.value })
+            }
+          />
+        </Field>
+
+        <Field label="Client">
+          <Select
+            value={form.clientId}
+            onChange={(e) =>
+              setForm({ ...form, clientId: e.target.value })
+            }
+          >
+            <option value="">Select Client</option>
+
+            {clients
+              .filter((client) => client.status === "active")
+              .map((client) => (
+                <option key={client._id} value={client._id}>
+                  {client.clientName}
+                </option>
+              ))}
+          </Select>
+        </Field>
+      </div>
+
+      <SectionCard
+        title="Employee Payroll Configuration"
+        subtitle="Define employee payout rates used for salary calculation."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Pay Type">
+            <Select
+              value={form.payType}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  payType: e.target.value,
+                  perDayRate:
+                    e.target.value === "daily"
+                      ? form.perDayRate
+                      : "",
+                  perHourRate:
+                    e.target.value === "hourly"
+                      ? form.perHourRate
+                      : "",
+                  clientPerDayRate:
+                    e.target.value === "daily"
+                      ? form.clientPerDayRate
+                      : "",
+                  clientPerHourRate:
+                    e.target.value === "hourly"
+                      ? form.clientPerHourRate
+                      : "",
+                })
+              }
+            >
+              <option value="daily">Daily</option>
+              <option value="hourly">Hourly</option>
+            </Select>
+          </Field>
+
+<Field label="Annual Gross Salary">
+  <Input
+    type="number"
+    min="0"
+    step="0.01"
+    value={form.annualGrossSalary}
+    onChange={(e) =>
+      setForm({
+        ...form,
+        annualGrossSalary: e.target.value,
+      })
+    }
+    placeholder="76000"
+  />
 </Field>
-                  </div>
 
-                  <SectionCard
-                    title="Employee Payroll Configuration"
-                    subtitle="Define employee payout rates used for salary calculation."
-                  >
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Pay Type">
-                        <Select
-                          value={form.payType}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              payType: e.target.value,
-                              perDayRate:
-                                e.target.value === "daily" ? form.perDayRate : "",
-                              perHourRate:
-                                e.target.value === "hourly"
-                                  ? form.perHourRate
-                                  : "",
-                              clientPerDayRate:
-                                e.target.value === "daily"
-                                  ? form.clientPerDayRate
-                                  : "",
-                              clientPerHourRate:
-                                e.target.value === "hourly"
-                                  ? form.clientPerHourRate
-                                  : "",
-                            })
-                          }
-                        >
-                          <option value="daily">Daily</option>
-                          <option value="hourly">Hourly</option>
-                        </Select>
-                      </Field>
+<Field label="Monthly Gross Salary">
+  <Input
+    type="text"
+    value={form.monthlyGrossSalary}
+    disabled
+    placeholder="Auto Calculated"
+  />
+</Field>
 
-                      <Field label="OT Rate Per Hour">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={form.otRatePerHour}
-                          onChange={(e) =>
-                            setForm({ ...form, otRatePerHour: e.target.value })
-                          }
-                        />
-                      </Field>
+          <Field label="OT Rate Per Hour">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.otRatePerHour}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  otRatePerHour: e.target.value,
+                })
+              }
+            />
+          </Field>
 
-                      {form.payType === "daily" && (
-                        <Field label="Employee Per Day Rate">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.perDayRate}
-                            onChange={(e) =>
-                              setForm({ ...form, perDayRate: e.target.value })
-                            }
-                            required
-                          />
-                        </Field>
-                      )}
+          {form.payType === "daily" && (
+            <Field label="Employee Per Day Rate">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.perDayRate}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    perDayRate: e.target.value,
+                  })
+                }
+                required
+              />
+            </Field>
+          )}
 
-                      {form.payType === "hourly" && (
-                        <Field label="Employee Per Hour Rate">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.perHourRate}
-                            onChange={(e) =>
-                              setForm({ ...form, perHourRate: e.target.value })
-                            }
-                            required
-                          />
-                        </Field>
-                      )}
-                    </div>
-                  </SectionCard>
+          {form.payType === "hourly" && (
+            <Field label="Employee Per Hour Rate">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.perHourRate}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    perHourRate: e.target.value,
+                  })
+                }
+                required
+              />
+            </Field>
+          )}
+        </div>
+      </SectionCard>
 
-                  <SectionCard
-                    title="PO / Client Billing Configuration"
-                    subtitle="Define client billing rates used for PO amount and invoices."
-                  >
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {form.payType === "daily" && (
-                        <Field label="Client / PO Per Day Rate">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.clientPerDayRate}
-                            onChange={(e) =>
-                              setForm({
-                                ...form,
-                                clientPerDayRate: e.target.value,
-                              })
-                            }
-                          />
-                        </Field>
-                      )}
+      <SectionCard
+        title="PO / Client Billing Configuration"
+        subtitle="Define client billing rates used for PO amount and invoices."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          {form.payType === "daily" && (
+            <Field label="Client / PO Per Day Rate">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.clientPerDayRate}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    clientPerDayRate: e.target.value,
+                  })
+                }
+              />
+            </Field>
+          )}
 
-                      {form.payType === "hourly" && (
-                        <Field label="Client / PO Per Hour Rate">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.clientPerHourRate}
-                            onChange={(e) =>
-                              setForm({
-                                ...form,
-                                clientPerHourRate: e.target.value,
-                              })
-                            }
-                          />
-                        </Field>
-                      )}
+          {form.payType === "hourly" && (
+            <Field label="Client / PO Per Hour Rate">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.clientPerHourRate}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    clientPerHourRate: e.target.value,
+                  })
+                }
+              />
+            </Field>
+          )}
 
-                      <Field label="Client / PO OT Rate">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={form.clientOtRatePerHour}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              clientOtRatePerHour: e.target.value,
-                            })
-                          }
-                        />
-                      </Field>
+          <Field label="Client / PO OT Rate">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.clientOtRatePerHour}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  clientOtRatePerHour: e.target.value,
+                })
+              }
+            />
+          </Field>
 
-                      <Field label="Payroll Status">
-                        <label className="flex h-[46px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4">
-                          <input
-                            type="checkbox"
-                            checked={form.payrollEnabled}
-                            onChange={(e) =>
-                              setForm({
-                                ...form,
-                                payrollEnabled: e.target.checked,
-                              })
-                            }
-                            className="h-4 w-4"
-                          />
-                          <span className="text-sm text-slate-700">
-                            Enable payroll
-                          </span>
-                        </label>
-                      </Field>
-                    </div>
-                  </SectionCard>
+          <Field label="Payroll Status">
+            <label className="flex h-[46px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4">
+              <input
+                type="checkbox"
+                checked={form.payrollEnabled}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    payrollEnabled: e.target.checked,
+                  })
+                }
+                className="h-4 w-4"
+              />
 
-                  {message && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                      {message}
-                    </div>
-                  )}
+              <span className="text-sm text-slate-700">
+                Enable payroll
+              </span>
+            </label>
+          </Field>
+        </div>
+      </SectionCard>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-70"
-                  >
-                    {loading ? "Creating Employee..." : "Create Employee"}
-                  </button>
-                </form>
-              </div>
+      {message && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          {message}
+        </div>
+      )}
 
-              <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200 min-w-0">
-                <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Employees Directory
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Search and manage all registered employees.
-                    </p>
-                  </div>
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-70"
+      >
+        {loading ? "Creating Employee..." : "Create Employee"}
+      </button>
+    </form>
+  </div>
 
-                  <div className="w-full xl:w-[340px]">
-                    <Input
-                      type="text"
-                      placeholder="Search by name, email, ID, department..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-                </div>
+</div>
 
-                <div className="block lg:hidden space-y-4">
-                  {pageLoading ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500">
-                      Loading employees...
-                    </div>
-                  ) : filteredEmployees.length > 0 ? (
-                    filteredEmployees.map((emp) => (
-                      <EmployeeMobileCard
-                        key={emp._id}
-                        emp={emp}
-                        onEdit={setEditingEmployee}
-                        onToggleStatus={toggleStatus}
-                        onDelete={deleteEmployee}
-                      />
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500">
-                      No employees found
-                    </div>
-                  )}
-                </div>
-
-                <div className="hidden lg:block overflow-hidden rounded-2xl border border-slate-200">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[1500px] w-full">
-                      <thead className="bg-slate-900 text-white">
-                        <tr>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Employee
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Employee ID
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Designation
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Department
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">Client</th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Pay Type
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Employee Rate
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Emp. OT
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            PO Rate
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            PO OT
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Payroll
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Status
-                          </th>
-                          <th className="px-4 py-4 text-left text-sm font-semibold">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody className="bg-white">
-                        {pageLoading ? (
-                          <tr>
-                            <td
-                              colSpan="12"
-                              className="px-4 py-10 text-center text-slate-500"
-                            >
-                              Loading employees...
-                            </td>
-                          </tr>
-                        ) : filteredEmployees.length > 0 ? (
-                          filteredEmployees.map((emp) => (
-                            <EmployeeDesktopRow
-                              key={emp._id}
-                              emp={emp}
-                              onEdit={setEditingEmployee}
-                              onToggleStatus={toggleStatus}
-                              onDelete={deleteEmployee}
-                            />
-                          ))
-                        ) : (
-                          <tr>
-                            <td
-                              colSpan="12"
-                              className="px-4 py-10 text-center text-slate-500"
-                            >
-                              No employees found
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <p className="mt-3 hidden lg:block text-xs text-slate-400">
-                  Scroll horizontally to view all payroll and PO-related columns.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

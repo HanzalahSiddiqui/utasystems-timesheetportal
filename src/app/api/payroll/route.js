@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Payroll from "@/models/Payroll";
+import User from "@/models/User";
 
 export async function GET(req) {
   try {
@@ -35,10 +36,29 @@ export async function GET(req) {
       ];
     }
 
-    const items = await Payroll.find(query).sort({
-      employeeName: 1,
-      createdAt: -1,
+    const payrollItems = await Payroll.find(query).sort({
+  employeeName: 1,
+  createdAt: -1,
+});
+
+const items = await Promise.all(
+  payrollItems.map(async (item) => {
+
+    const employee = await User.findOne({
+      employeeId: item.employeeCode,
     });
+
+    return {
+      ...item.toObject(),
+
+      annualGrossSalary:
+        employee?.annualGrossSalary || 0,
+
+      monthlyGrossSalary:
+        employee?.monthlyGrossSalary || 0,
+    };
+  })
+);
 
     return Response.json({ items });
   } catch (error) {

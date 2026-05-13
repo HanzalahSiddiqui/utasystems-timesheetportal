@@ -69,6 +69,15 @@ const UserSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    annualGrossSalary: {
+  type: Number,
+  default: 0,
+},
+
+monthlyGrossSalary: {
+  type: Number,
+  default: 0,
+},
 
     clientPerDayRate: {
       type: Number,
