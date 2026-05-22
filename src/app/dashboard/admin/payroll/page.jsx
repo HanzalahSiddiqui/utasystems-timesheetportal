@@ -346,6 +346,9 @@ export default function AdminPayrollPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold">Present Days</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Regular Hours</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">OT Hours</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">
+  Total OT Pay (Per Diem)
+</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Gross Calculated Salary</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">
   Annual Gross
@@ -357,7 +360,7 @@ export default function AdminPayrollPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold">PO Amount</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Margin</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Employee Expense</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Real Profit</th>
+                        {/* <th className="px-4 py-3 text-left text-sm font-semibold">Real Profit</th> */}
                         <th className="px-4 py-3 text-left text-sm font-semibold">Net Pay</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Employer Tax</th>
 <th className="px-4 py-3 text-left text-sm font-semibold">Net Profit</th>
@@ -402,6 +405,9 @@ export default function AdminPayrollPage() {
                               {item.otHours}
                             </td>
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
+  {Number(item.otPay || 0).toLocaleString()}
+</td>
+                            <td className="px-4 py-4 text-sm font-semibold text-slate-900">
                               {item.grossPay}
                             </td>
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
@@ -422,9 +428,9 @@ export default function AdminPayrollPage() {
   {item.employeeExpense || 0}
 </td>
 
-<td className="px-4 py-4 text-sm font-semibold text-green-700">
+{/* <td className="px-4 py-4 text-sm font-semibold text-green-700">
   {item.realProfit || 0}
-</td>
+</td> */}
 
 <td className="px-4 py-4 text-sm font-semibold text-slate-900">
   {item.netPay}
