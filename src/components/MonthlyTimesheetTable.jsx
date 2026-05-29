@@ -44,6 +44,9 @@ export default function MonthlyTimesheetTable({
   const [rows, setRows] = useState([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [rangeLeaveType, setRangeLeaveType] = useState("");
+const [rangeStartDate, setRangeStartDate] = useState("");
+const [rangeEndDate, setRangeEndDate] = useState("");
 
   useEffect(() => {
     const entryMap = new Map(existingEntries.map((e) => [e.date, e]));
@@ -115,6 +118,56 @@ export default function MonthlyTimesheetTable({
 
   const monthlyGrandTotal = monthlyRegularTotal + monthlyOtTotal;
 
+
+  function applyLeaveRange() {
+    const selectedMonth = month;
+
+  if (
+    !rangeStartDate.startsWith(selectedMonth) ||
+    !rangeEndDate.startsWith(selectedMonth)
+  ) {
+    alert("Dates must belong to selected month");
+    return;
+  }
+
+  if (
+    !rangeLeaveType ||
+    !rangeStartDate ||
+    !rangeEndDate
+  ) {
+    alert("Please select leave type and date range");
+    return;
+  }
+
+  const updated = rows.map((row) => {
+
+  // Skip holidays
+  if (row.isHoliday) {
+    return row;
+  }
+
+  // Skip weekends
+  if (row.isWeekend) {
+    return row;
+  }
+
+  if (
+    row.date >= rangeStartDate &&
+    row.date <= rangeEndDate
+  ) {
+    return {
+      ...row,
+      leaveType: rangeLeaveType,
+      regularHours: "",
+      otHours: "",
+    };
+  }
+
+  return row;
+});
+
+  setRows(updated);
+}
   async function saveTimesheet(submit = false) {
     try {
       setSaving(true);
@@ -167,6 +220,49 @@ export default function MonthlyTimesheetTable({
   return (
     <div className="bg-white rounded-2xl shadow overflow-x-auto">
       <div className="p-4 border-b flex justify-between items-center gap-3 flex-wrap">
+        <div className="px-4 py-4 border-b bg-slate-50">
+  <h4 className="font-semibold mb-3">
+    Apply Leave Range
+  </h4>
+
+  <div className="flex flex-wrap gap-3 items-end">
+
+    <select
+      value={rangeLeaveType}
+      onChange={(e) => setRangeLeaveType(e.target.value)}
+      className="border rounded-lg px-3 py-2"
+    >
+      <option value="">Leave Type</option>
+      <option value="CL">CL</option>
+      <option value="STUL">STUL</option>
+      <option value="LTUL">LTUL</option>
+    </select>
+
+    <input
+      type="date"
+      value={rangeStartDate}
+      onChange={(e) => setRangeStartDate(e.target.value)}
+      className="border rounded-lg px-3 py-2"
+    />
+
+    <input
+      type="date"
+      value={rangeEndDate}
+      onChange={(e) => setRangeEndDate(e.target.value)}
+      className="border rounded-lg px-3 py-2"
+    />
+
+    <button
+      type="button"
+      onClick={applyLeaveRange}
+      disabled={locked}
+      className="bg-slate-800 text-white px-4 py-2 rounded-lg"
+    >
+      Apply Leave
+    </button>
+
+  </div>
+</div>
         <h3 className="font-semibold text-lg">Monthly Timesheet</h3>
 
         <div className="flex gap-3">
@@ -189,6 +285,15 @@ export default function MonthlyTimesheetTable({
       </div>
 
       {message && <div className="px-4 py-3 text-sm">{message}</div>}
+      <div className="px-4 py-3 bg-slate-50 border-b text-sm">
+  {/* <div className="font-semibold mb-2">Leave Legend</div> */}
+
+  <div className="flex flex-wrap gap-4">
+    <span><strong>CL</strong> = Casual Leave</span>
+    <span><strong>STUL</strong> = Short Term Unpaid Leave</span>
+    <span><strong>LTUL</strong> = Long Term Unpaid Leave</span>
+  </div>
+</div>
 
       <table className="w-full min-w-[1200px]">
         <thead className="bg-slate-700 text-white">
@@ -263,10 +368,10 @@ export default function MonthlyTimesheetTable({
                     }
                     className="border rounded-lg px-3 py-2 w-28 disabled:bg-gray-200"
                   >
-                    <option value="">Select</option>
-                    <option value="L">L</option>
-                    <option value="SL">SL</option>
-                    <option value="VL">VL</option>
+                   <option value="">Select</option>
+<option value="CL">CL - Casual Leave</option>
+<option value="STUL">STUL - Short Term Unpaid Leave</option>
+<option value="LTUL">LTUL - Long Term Unpaid Leave</option>
                   </select>
                 </td>
 

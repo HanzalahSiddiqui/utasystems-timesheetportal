@@ -26,13 +26,13 @@ function summarizeEntries(entries = []) {
       presentDays += 1;
     }
 
-    if (leave === "SL" || leave === "VL") {
-      paidLeaveDays += 1;
-    }
-
-    if (leave === "L") {
-      unpaidLeaveDays += 1;
-    }
+    if (
+  leave === "CL" ||
+  leave === "STUL" ||
+  leave === "LTUL"
+) {
+  unpaidLeaveDays += 1;
+}
 
     regularHours += regular;
     otHours += ot;
@@ -66,7 +66,7 @@ function buildPayrollFromTimesheet(user, timesheet, month) {
   let poRegularAmount = 0;
 
   if (payType === "daily") {
-    payableDays = summary.presentDays + summary.paidLeaveDays;
+    payableDays = summary.presentDays;
 
     regularPay = payableDays * perDayRate;
     poRegularAmount = payableDays * clientPerDayRate;

@@ -128,6 +128,11 @@ async function review(action) {
   );
 
   const grandTotal = regularTotal + otTotal;
+  const leaveLabels = {
+  CL: "CL - Casual Leave",
+  STUL: "STUL - Short Term Unpaid Leave",
+  LTUL: "LTUL - Long Term Unpaid Leave",
+};
 
   return (
     <div className="min-h-screen flex bg-gray-100">
@@ -173,7 +178,15 @@ async function review(action) {
               </p>
             )}
           </div>
+<div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+ 
 
+  <div className="flex flex-wrap gap-4 text-sm">
+    <span><strong>CL</strong> = Casual Leave</span>
+    <span><strong>STUL</strong> = Short Term Unpaid Leave</span>
+    <span><strong>LTUL</strong> = Long Term Unpaid Leave</span>
+  </div>
+</div>
           <div className="bg-white rounded-2xl shadow overflow-x-auto">
             <table className="w-full min-w-[1100px]">
               <thead className="bg-slate-700 text-white">
@@ -197,7 +210,9 @@ async function review(action) {
                     <td className="p-3">{row.date}</td>
                     <td className="p-3">{row.regularHours}</td>
                     <td className="p-3">{row.otHours}</td>
-                    <td className="p-3">{row.leaveType || "-"}</td>
+                    <td className="p-3">
+  {leaveLabels[row.leaveType] || row.leaveType || "-"}
+</td>
                     <td className="p-3">{row.isHoliday ? row.holidayTitle || "Holiday" : "-"}</td>
                     <td className="p-3 font-semibold">{row.total}</td>
                   </tr>
