@@ -4,459 +4,1347 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
-import ReceiptUploadField from "@/components/ReceiptUploadField";
 import ExpenseStatusBadge from "@/components/ExpenseStatusBadge";
 
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
+const ALLOWED_FILE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "application/pdf",
+];
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export default function AdminExpenseDetailPage() {
   const params = useParams();
   const router = useRouter();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [item, setItem] = useState(null);
-  const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [employees, setEmployees] = useState([]);
 
-  const [form, setForm] = useState({
-    expenseType: "travel",
-    amount: "",
-    description: "",
-    receiptUrl: "",
-    receiptFileName: "",
-    incurredByName: "",
-    incurredFor: "self",
-    paidBy: "employee",
-    status: "submitted",
-    reviewComment: "",
-  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  /* ================================
+     FORM STATES
+  ================================= */
+
+  const [category, setCategory] = useState("");
+  const [expenseType, setExpenseType] = useState("");
+  const [amount, setAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [incurredByName, setIncurredByName] = useState("");
+  const [incurredFor, setIncurredFor] = useState("self");
+
+  const [paidBy, setPaidBy] = useState("company");
+  const [paidByEmployeeId, setPaidByEmployeeId] =
+    useState("");
+
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptFileName, setReceiptFileName] =
+    useState("");
+
+  const [status, setStatus] = useState("submitted");
+  const [reviewComment, setReviewComment] =
+    useState("");
+
+  /* ================================
+     LOAD EXPENSE
+  ================================= */
 
   async function loadItem() {
-    const res = await fetch(`/api/expenses/${params.id}`, {
-      cache: "no-store",
-    });
-
-    const text = await res.text();
-    let data = {};
-
     try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = {};
+      setLoading(true);
+
+      const res = await fetch(
+        `/api/expenses/${params.id}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(
+          data.error || "Failed to load expense"
+        );
+        setItem(null);
+        return;
+      }
+
+      const expense = data.item;
+
+      setItem(expense);
+
+      /* -------------------------------
+         SET FORM VALUES
+      -------------------------------- */
+
+      setCategory(
+        expense.category || ""
+      );
+
+      setExpenseType(
+        expense.expenseType ||
+          expense.category ||
+          ""
+      );
+
+      setAmount(
+        expense.amount ?? ""
+      );
+
+      setDescription(
+        expense.description || ""
+      );
+
+      setIncurredByName(
+        expense.incurredByName || ""
+      );
+
+      setIncurredFor(
+        expense.incurredFor || "self"
+      );
+
+      setExpenseDate(
+        expense.expenseDate
+          ? new Date(expense.expenseDate)
+              .toISOString()
+              .split("T")[0]
+          : ""
+      );
+
+      setPaidBy(
+        expense.paidBy || "company"
+      );
+
+      setPaidByEmployeeId(
+        expense.paidByEmployeeId?._id ||
+          expense.paidByEmployeeId ||
+          ""
+      );
+
+      setReceiptUrl(
+        expense.receiptUrl ||
+          expense.evidence?.[0]?.url ||
+          ""
+      );
+
+      setReceiptFileName(
+        expense.receiptFileName ||
+          expense.evidence?.[0]?.fileName ||
+          ""
+      );
+
+      setStatus(
+        expense.status || "submitted"
+      );
+
+      setReviewComment(
+        expense.reviewComment || ""
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to load expense:",
+        error
+      );
+
+      alert("Failed to load expense");
+
+    } finally {
+      setLoading(false);
     }
+  }
 
-    setItem(data.item || null);
+  /* ================================
+     LOAD EMPLOYEES
+  ================================= */
 
-    if (data.item) {
-      setForm({
-        expenseType: data.item.expenseType || "travel",
-        amount: data.item.amount ?? "",
-        description: data.item.description || "",
-        receiptUrl: data.item.receiptUrl || "",
-        receiptFileName: data.item.receiptFileName || "",
-        incurredByName: data.item.incurredByName || "",
-        incurredFor: data.item.incurredFor || "self",
-        paidBy: data.item.paidBy || "employee",
-        status: data.item.status || "submitted",
-        reviewComment: data.item.reviewComment || "",
-      });
+  async function loadEmployees() {
+    try {
+      const res = await fetch(
+        "/api/employees",
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setEmployees(
+          data.items ||
+            data.employees ||
+            []
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load employees:",
+        error
+      );
+
+      setEmployees([]);
     }
   }
 
   useEffect(() => {
-  if (!params?.id) return;
+    if (params?.id) {
+      loadItem();
+      loadEmployees();
+    }
+  }, [params?.id]);
 
-  loadItem();
-}, [params]);
+  /* ================================
+     RECEIPT UPLOAD
+  ================================= */
 
-  async function saveChanges(e) {
-    e.preventDefault();
+  async function handleFileUpload(file) {
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert(
+        "File size must be less than 5MB"
+      );
+      return;
+    }
+
+    if (
+      !ALLOWED_FILE_TYPES.includes(
+        file.type
+      )
+    ) {
+      alert(
+        "Only JPG, PNG, and PDF files are allowed"
+      );
+      return;
+    }
+
+    setUploading(true);
+
+    const formData = new FormData();
+
+    formData.append("file", file);
 
     try {
-      setSaving(true);
-      setMessage("");
+      const res = await fetch(
+        "/api/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
-      const res = await fetch(`/api/expenses/${params.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...form,
-          amount: Number(form.amount || 0),
-        }),
-      });
+      const data = await res.json();
 
-      const text = await res.text();
-      let data = {};
-
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
-      }
-
-      if (!res.ok) {
-        setMessage(data.error || "Failed to update expense");
+      if (!res.ok || !data.url) {
+        alert(
+          data.error ||
+            "Receipt upload failed"
+        );
         return;
       }
 
-      setMessage(data.message || "Expense updated successfully");
+      setReceiptUrl(data.url);
+
+      setReceiptFileName(
+        data.name || file.name
+      );
+
+    } catch (error) {
+      console.error(
+        "Receipt upload error:",
+        error
+      );
+
+      alert("Receipt upload failed");
+
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /* ================================
+     SAVE CHANGES
+  ================================= */
+
+  async function handleSave() {
+    if (saving || uploading) return;
+
+    /* --------------------------------
+       PAID BY VALIDATION
+    -------------------------------- */
+
+    if (
+      paidBy === "employee" &&
+      !paidByEmployeeId
+    ) {
+      alert(
+        "Please select the employee who paid this expense"
+      );
+      return;
+    }
+
+    /* --------------------------------
+       STATUS VALIDATION
+    -------------------------------- */
+
+    if (
+      status === "rejected" &&
+      !reviewComment.trim()
+    ) {
+      alert(
+        "Please enter a rejection comment"
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const res = await fetch(
+        `/api/expenses/${params.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            category,
+            expenseType,
+            amount,
+            description,
+            expenseDate,
+
+            incurredByName:
+              incurredByName.trim(),
+
+            incurredFor,
+
+            paidBy,
+
+            paidByEmployeeId:
+              paidBy === "employee"
+                ? paidByEmployeeId
+                : null,
+
+            receiptUrl:
+              receiptUrl || undefined,
+
+            receiptFileName,
+
+            status,
+
+            reviewComment:
+              reviewComment.trim(),
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(
+          data.error ||
+            "Failed to save changes"
+        );
+        return;
+      }
+
+      alert(
+        "Expense updated successfully"
+      );
+
       await loadItem();
-    } catch {
-      setMessage("Something went wrong");
+
+    } catch (error) {
+      console.error(
+        "Save expense error:",
+        error
+      );
+
+      alert(
+        "Something went wrong while saving"
+      );
+
     } finally {
       setSaving(false);
     }
   }
 
-  async function quickApprove() {
-    const res = await fetch(`/api/expenses/${params.id}/approve`, {
-      method: "PATCH",
-    });
+  /* ================================
+     QUICK APPROVE
+  ================================= */
 
-    const text = await res.text();
-    let data = {};
+  async function handleApprove() {
+    if (saving) return;
+
+    if (
+      !confirm(
+        "Are you sure you want to approve this expense?"
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
 
     try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = {};
-    }
+      const res = await fetch(
+        `/api/expenses/${params.id}/approve`,
+        {
+          method: "PATCH",
+        }
+      );
 
-    if (!res.ok) {
-      setMessage(data.error || "Failed to approve expense");
-      return;
-    }
+      const data = await res.json();
 
-    setMessage(data.message || "Expense approved successfully");
-    loadItem();
+      if (!res.ok) {
+        alert(
+          data.error ||
+            "Failed to approve expense"
+        );
+        return;
+      }
+
+      alert(
+        "Expense approved successfully"
+      );
+
+      await loadItem();
+
+    } catch (error) {
+      console.error(error);
+      alert("Approval failed");
+
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function quickReject() {
-    if (!form.reviewComment.trim()) {
-      setMessage("Review comment is required for rejection");
+  /* ================================
+     QUICK REJECT
+  ================================= */
+
+  async function handleReject() {
+    const reason = prompt(
+      "Enter rejection comment:"
+    );
+
+    if (!reason?.trim()) {
       return;
     }
 
-    const res = await fetch(`/api/expenses/${params.id}/reject`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        reviewComment: form.reviewComment,
-      }),
-    });
-
-    const text = await res.text();
-    let data = {};
+    setSaving(true);
 
     try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = {};
-    }
+      const res = await fetch(
+        `/api/expenses/${params.id}/reject`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            reviewComment:
+              reason.trim(),
+          }),
+        }
+      );
 
-    if (!res.ok) {
-      setMessage(data.error || "Failed to reject expense");
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(
+          data.error ||
+            "Failed to reject expense"
+        );
+        return;
+      }
+
+      alert(
+        "Expense rejected successfully"
+      );
+
+      await loadItem();
+
+    } catch (error) {
+      console.error(error);
+      alert("Rejection failed");
+
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ================================
+     MARK AS PAID
+  ================================= */
+
+  async function handleMarkAsPaid() {
+    if (saving) return;
+
+    if (
+      !confirm(
+        "Are you sure you want to mark this expense as paid?"
+      )
+    ) {
       return;
     }
 
-    setMessage(data.message || "Expense rejected successfully");
-    loadItem();
+    setSaving(true);
+
+    try {
+      const res = await fetch(
+        `/api/expenses/${params.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            status: "paid",
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(
+          data.error ||
+            "Failed to mark expense as paid"
+        );
+        return;
+      }
+
+      alert(
+        "Expense marked as paid"
+      );
+
+      await loadItem();
+
+    } catch (error) {
+      console.error(error);
+      alert(
+        "Failed to mark expense as paid"
+      );
+
+    } finally {
+      setSaving(false);
+    }
   }
+
+  /* ================================
+     DELETE
+  ================================= */
+
+  async function handleDelete() {
+    if (
+      !confirm(
+        "WARNING: This will permanently delete this expense. Are you sure?"
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const res = await fetch(
+        `/api/expenses/${params.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(
+          data.error ||
+            "Failed to delete expense"
+        );
+        return;
+      }
+
+      alert(
+        "Expense deleted successfully"
+      );
+
+      router.push(
+        "/dashboard/admin/expenses"
+      );
+
+    } catch (error) {
+      console.error(error);
+      alert("Delete failed");
+
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ================================
+     LOADING
+  ================================= */
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-6">
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          Loading expense...
+        </div>
+      </div>
+    );
+  }
+
+  /* ================================
+     NOT FOUND
+  ================================= */
 
   if (!item) {
-    return <div className="p-6">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-slate-100 p-6">
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          Expense not found.
+        </div>
+      </div>
+    );
   }
+
+  /* ================================
+     RECEIPT
+  ================================= */
+
+  const isPdf =
+    receiptUrl
+      ?.toLowerCase()
+      .includes(".pdf");
+
+  /* ================================
+     UI
+  ================================= */
 
   return (
     <div className="min-h-screen bg-slate-100">
+
       <div className="flex min-h-screen">
-        <Sidebar
-          role="admin"
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
 
-        <div className="min-w-0 flex-1">
-          <Navbar
-            user="Admin User"
-            onMenuClick={() => setSidebarOpen(true)}
-          />
+        <Sidebar role="admin" />
 
-          <div className="mx-auto w-full max-w-[1500px] p-4 sm:p-6 space-y-6">
+        <div className="flex-1 min-w-0">
+
+          <Navbar user="Admin User" />
+
+          <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6 space-y-6">
+
+            {/* =========================
+                HEADER
+            ========================== */}
+
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <button
-                  onClick={() => router.push("/dashboard/admin/expenses")}
-                  className="mb-3 rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200"
-                >
-                  ← Back to Expenses
-                </button>
 
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">
                   Expense Detail
                 </h1>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Admin control panel
+                </p>
               </div>
 
-              <ExpenseStatusBadge status={item.status} />
+              <button
+                onClick={() =>
+                  router.push(
+                    "/dashboard/admin/expenses"
+                  )
+                }
+                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300"
+              >
+                Back
+              </button>
+
             </div>
 
-            {message ? (
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                {message}
+            {/* =========================
+                EXPENSE SUMMARY
+            ========================== */}
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+
+              <div className="grid gap-5 md:grid-cols-3">
+
+                <div>
+                  <p className="text-sm text-slate-500">
+                    Expense ID
+                  </p>
+
+                  <p className="mt-1 font-semibold">
+                    {item.expenseId || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-slate-500">
+                    Employee
+                  </p>
+
+                  <p className="mt-1 font-semibold">
+                    {item.employeeName ||
+                      "Company"}
+                  </p>
+
+                  {item.employeeCode && (
+                    <p className="text-xs text-slate-500">
+                      {item.employeeCode}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm text-slate-500">
+                    Added By
+                  </p>
+
+                  <p className="mt-1 font-semibold">
+                    {item.createdBy?.name ||
+                      (item.createdBy?.role ===
+                      "admin"
+                        ? "Admin"
+                        : "Employee")}
+                  </p>
+                </div>
+
               </div>
-            ) : null}
 
-            <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                <h2 className="mb-5 text-xl font-semibold text-slate-900">
-                  Receipt
-                </h2>
+            </div>
 
-        {form.receiptUrl ? (
-  <div className="space-y-4">
+            {/* =========================
+                EDIT FORM
+            ========================== */}
 
-    {/* 🔹 Button */}
-    <a
-      href={form.receiptUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
-    >
-      View / Download Receipt
-    </a>
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
 
-    {/* 🔹 Preview */}
-    {form.receiptUrl.toLowerCase().endsWith(".pdf") ? (
-      <iframe
-        src={form.receiptUrl}
-        className="w-full h-[600px] rounded-2xl border"
-      />
-    ) : (
-      <img
-        src={form.receiptUrl}
-        alt="Receipt"
-        className="max-h-[700px] w-full rounded-2xl object-contain bg-slate-50"
-      />
-    )}
+              <h2 className="mb-5 text-lg font-semibold">
+                Expense Information
+              </h2>
 
-  </div>
-) : (
-  <p className="text-slate-500">No receipt available</p>
-)}
-              </div>
+              <div className="grid gap-4 md:grid-cols-2">
 
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                <h2 className="mb-5 text-xl font-semibold text-slate-900">
-                  Expense Controls
-                </h2>
+                {/* CATEGORY */}
 
-                <form onSubmit={saveChanges} className="space-y-4">
-                  <Field label="Expense Type">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Category
+                  </label>
+
+                  <select
+                    value={category}
+                    onChange={(e) =>
+                      setCategory(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  >
+                    <option value="">
+                      Select Category
+                    </option>
+
+                    <option value="travel">
+                      Travel
+                    </option>
+
+                    <option value="fuel">
+                      Fuel
+                    </option>
+
+                    <option value="meal">
+                      Meal
+                    </option>
+
+                    <option value="hotel">
+                      Hotel
+                    </option>
+
+                    <option value="medical">
+                      Medical
+                    </option>
+
+                    <option value="office">
+                      Office
+                    </option>
+
+                    <option value="internet">
+                      Internet
+                    </option>
+
+                    <option value="insurance">
+                      Insurance
+                    </option>
+
+                    <option value="utilities">
+                      Utilities
+                    </option>
+
+                    <option value="rent">
+                      Rent
+                    </option>
+
+                    <option value="software">
+                      Software
+                    </option>
+
+                    <option value="marketing">
+                      Marketing
+                    </option>
+
+                    <option value="transport">
+                      Transport
+                    </option>
+
+                    <option value="other">
+                      Other
+                    </option>
+                  </select>
+                </div>
+
+                {/* AMOUNT */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Amount (USD)
+                  </label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) =>
+                      setAmount(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  />
+                </div>
+
+                {/* EXPENSE DATE */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Expense Date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={expenseDate}
+                    onChange={(e) =>
+                      setExpenseDate(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  />
+                </div>
+
+                {/* INCURRED BY */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Incurred By
+                  </label>
+
+                  <input
+                    value={incurredByName}
+                    onChange={(e) =>
+                      setIncurredByName(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  />
+                </div>
+
+                {/* INCURRED FOR */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Incurred For
+                  </label>
+
+                  <select
+                    value={incurredFor}
+                    onChange={(e) =>
+                      setIncurredFor(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  >
+                    <option value="self">
+                      Self
+                    </option>
+
+                    <option value="company">
+                      Company
+                    </option>
+
+                    <option value="client">
+                      Client
+                    </option>
+
+                    <option value="other">
+                      Other
+                    </option>
+                  </select>
+                </div>
+
+                {/* PAID BY */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Paid By
+                  </label>
+
+                  <select
+                    value={paidBy}
+                    onChange={(e) => {
+                      setPaidBy(
+                        e.target.value
+                      );
+
+                      if (
+                        e.target.value ===
+                        "company"
+                      ) {
+                        setPaidByEmployeeId(
+                          ""
+                        );
+                      }
+                    }}
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  >
+                    <option value="company">
+                      Company
+                    </option>
+
+                    <option value="employee">
+                      Employee
+                    </option>
+                  </select>
+                </div>
+
+                {/* PAID BY EMPLOYEE */}
+
+                {paidBy ===
+                  "employee" && (
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Employee Who Paid
+                    </label>
+
                     <select
-                      value={form.expenseType}
-                      onChange={(e) =>
-                        setForm({ ...form, expenseType: e.target.value })
+                      value={
+                        paidByEmployeeId
                       }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
+                      onChange={(e) =>
+                        setPaidByEmployeeId(
+                          e.target.value
+                        )
+                      }
+                      className="w-full rounded-lg border px-3 py-2"
+                      disabled={
+                        saving ||
+                        uploading
+                      }
                     >
-                      <option value="travel">travel</option>
-                      <option value="meal">meal</option>
-                      <option value="fuel">fuel</option>
-                      <option value="hotel">hotel</option>
-                      <option value="medical">medical</option>
-                      <option value="office">office</option>
-                      <option value="internet">internet</option>
-                      <option value="transport">transport</option>
-                      <option value="other">other</option>
+                      <option value="">
+                        Select Employee
+                      </option>
+
+                      {employees.map(
+                        (emp) => (
+                          <option
+                            key={
+                              emp._id
+                            }
+                            value={
+                              emp._id
+                            }
+                          >
+                            {emp.name}
+                          </option>
+                        )
+                      )}
                     </select>
-                  </Field>
+                  </div>
+                )}
 
-                  <Field label="Amount">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.amount}
-                      onChange={(e) =>
-                        setForm({ ...form, amount: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    />
-                  </Field>
+                {/* STATUS */}
 
-                  <Field label="Incurred By / Whose Expense">
-                    <input
-                      value={form.incurredByName}
-                      onChange={(e) =>
-                        setForm({ ...form, incurredByName: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    />
-                  </Field>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Status
+                  </label>
 
-                  <Field label="Incurred For">
-                    <select
-                      value={form.incurredFor}
-                      onChange={(e) =>
-                        setForm({ ...form, incurredFor: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    >
-                      <option value="self">self</option>
-                      <option value="company">company</option>
-                      <option value="client">client</option>
-                      <option value="other">other</option>
-                    </select>
-                  </Field>
+                  <select
+                    value={status}
+                    onChange={(e) =>
+                      setStatus(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  >
+                    <option value="draft">
+                      Draft
+                    </option>
 
-                  <Field label="Paid By">
-                    <select
-                      value={form.paidBy}
-                      onChange={(e) =>
-                        setForm({ ...form, paidBy: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    >
-                      <option value="employee">employee</option>
-                      <option value="company">company</option>
-                    </select>
-                  </Field>
+                    <option value="submitted">
+                      Submitted
+                    </option>
 
-                  <Field label="Status">
-                    <select
-                      value={form.status}
-                      onChange={(e) =>
-                        setForm({ ...form, status: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    >
-                      <option value="draft">draft</option>
-                      <option value="submitted">submitted</option>
-                      <option value="approved">approved</option>
-                      <option value="rejected">rejected</option>
-                      <option value="paid">paid</option>
-                    </select>
-                  </Field>
+                    <option value="approved">
+                      Approved
+                    </option>
 
-                  <Field label="Description">
-                    <textarea
-                      rows={4}
-                      value={form.description}
-                      onChange={(e) =>
-                        setForm({ ...form, description: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    />
-                  </Field>
+                    <option value="rejected">
+                      Rejected
+                    </option>
 
-                  <Field label="Review Comment">
-                    <textarea
-                      rows={4}
-                      value={form.reviewComment}
-                      onChange={(e) =>
-                        setForm({ ...form, reviewComment: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3"
-                    />
-                  </Field>
+                    <option value="paid">
+                      Paid
+                    </option>
+                  </select>
+                </div>
 
-                  <ReceiptUploadField
-                    value={form.receiptUrl}
-                    onChange={({ receiptUrl, receiptFileName }) =>
-                      setForm({ ...form, receiptUrl, receiptFileName })
+                {/* DESCRIPTION */}
+
+                <div className="md:col-span-2">
+
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Description
+                  </label>
+
+                  <textarea
+                    value={description}
+                    onChange={(e) =>
+                      setDescription(
+                        e.target.value
+                      )
+                    }
+                    rows={4}
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
                     }
                   />
 
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-70"
-                    >
-                      {saving ? "Saving..." : "Save Changes"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={quickApprove}
-                      className="rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700"
-                    >
-                      Quick Approve
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={quickReject}
-                      className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white hover:bg-red-700"
-                    >
-                      Quick Reject
-                    </button>
-                  </div>
-                </form>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      Submitted At
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-slate-900">
-                      {item.submittedAt
-                        ? new Date(item.submittedAt).toLocaleString()
-                        : "-"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      Approved At
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-slate-900">
-                      {item.approvedAt
-                        ? new Date(item.approvedAt).toLocaleString()
-                        : "-"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      Rejected At
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-slate-900">
-                      {item.rejectedAt
-                        ? new Date(item.rejectedAt).toLocaleString()
-                        : "-"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      Paid At
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-slate-900">
-                      {item.paidAt
-                        ? new Date(item.paidAt).toLocaleString()
-                        : "-"}
-                    </p>
-                  </div>
                 </div>
+
+                {/* REVIEW COMMENT */}
+
+                <div className="md:col-span-2">
+
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Review / Admin Comment
+                  </label>
+
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) =>
+                      setReviewComment(
+                        e.target.value
+                      )
+                    }
+                    rows={3}
+                    placeholder="Add admin comment..."
+                    className="w-full rounded-lg border px-3 py-2"
+                    disabled={
+                      saving ||
+                      uploading
+                    }
+                  />
+
+                  {status ===
+                    "rejected" && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Rejection comment is required.
+                    </p>
+                  )}
+
+                </div>
+
               </div>
+
+              {/* =========================
+                  SAVE BUTTON
+              ========================== */}
+
+              <div className="mt-6 flex flex-wrap gap-3">
+
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={
+                    saving ||
+                    uploading
+                  }
+                  className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {saving
+                    ? "Saving..."
+                    : "Save Changes"}
+                </button>
+
+                {/* APPROVE */}
+
+                {item.status !==
+                  "approved" &&
+                  item.status !==
+                    "paid" && (
+
+                  <button
+                    type="button"
+                    onClick={
+                      handleApprove
+                    }
+                    disabled={saving}
+                    className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+
+                )}
+
+                {/* REJECT */}
+
+                {item.status !==
+                  "rejected" &&
+                  item.status !==
+                    "paid" && (
+
+                  <button
+                    type="button"
+                    onClick={
+                      handleReject
+                    }
+                    disabled={saving}
+                    className="rounded-lg bg-red-700 px-5 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+
+                )}
+
+                {/* MARK AS PAID */}
+
+                {item.status ===
+                  "approved" && (
+
+                  <button
+                    type="button"
+                    onClick={
+                      handleMarkAsPaid
+                    }
+                    disabled={saving}
+                    className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Mark as Paid
+                  </button>
+
+                )}
+
+                {/* DELETE */}
+
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Delete Expense
+                </button>
+
+              </div>
+
             </div>
+
+            {/* =========================
+                CURRENT STATUS
+            ========================== */}
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+
+              <h2 className="mb-4 text-lg font-semibold">
+                Current Status
+              </h2>
+
+              <ExpenseStatusBadge
+                status={item.status}
+              />
+
+              {item.reviewComment && (
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+
+                  <p className="text-sm font-semibold">
+                    Admin Comment
+                  </p>
+
+                  <p className="mt-1 whitespace-pre-line text-slate-700">
+                    {item.reviewComment}
+                  </p>
+
+                </div>
+
+              )}
+
+            </div>
+
+            {/* =========================
+                RECEIPT
+            ========================== */}
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+
+              <h2 className="mb-4 text-lg font-semibold">
+                Receipt
+              </h2>
+
+              {/* CURRENT RECEIPT */}
+
+              {receiptUrl ? (
+
+                <div className="space-y-4">
+
+                  <a
+                    href={receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                  >
+                    View / Download Receipt
+                  </a>
+
+                  {isPdf ? (
+
+                    <iframe
+                      src={receiptUrl}
+                      title="Receipt"
+                      className="h-[600px] w-full rounded-2xl border"
+                    />
+
+                  ) : (
+
+                    <img
+                      src={receiptUrl}
+                      alt="Receipt"
+                      className="max-h-[700px] w-full rounded-2xl bg-slate-50 object-contain"
+                    />
+
+                  )}
+
+                </div>
+
+              ) : (
+
+                <p className="text-sm text-slate-500">
+                  No receipt currently attached.
+                </p>
+
+              )}
+
+              {/* UPLOAD / REPLACE */}
+
+              <div className="mt-6 border-t pt-5">
+
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Upload / Replace Receipt
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,application/pdf"
+                  onChange={(e) =>
+                    handleFileUpload(
+                      e.target.files?.[0]
+                    )
+                  }
+                  disabled={
+                    saving ||
+                    uploading
+                  }
+                  className="w-full rounded-lg border px-3 py-2"
+                />
+
+                <p className="mt-1 text-xs text-slate-500">
+                  JPG, PNG or PDF — maximum 5MB
+                </p>
+
+                {uploading && (
+                  <p className="mt-2 text-sm text-slate-500">
+                    Uploading receipt...
+                  </p>
+                )}
+
+                {receiptFileName && (
+                  <p className="mt-2 text-sm text-slate-600">
+                    Selected:{" "}
+                    <span className="font-medium">
+                      {receiptFileName}
+                    </span>
+                  </p>
+                )}
+
+              </div>
+
+            </div>
+
           </div>
         </div>
       </div>
     </div>
   );
-}   
+}

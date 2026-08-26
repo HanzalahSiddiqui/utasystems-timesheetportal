@@ -2,10 +2,26 @@ import mongoose from "mongoose";
 
 const ExpenseSchema = new mongoose.Schema(
   {
+    // =========================================
+    // EXPENSE ID
+    // Format:
+    // EXP-YYYYMMDD-INITIALS-001
+    // Example:
+    // EXP-20260825-MA-001
+    // =========================================
+    expenseId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      immutable: true,
+      trim: true,
+      index: true,
+    },
+
     employeeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: false, // ✅ allow company expense
+      required: false, // allow company expense
     },
 
     employeeName: {
@@ -29,21 +45,26 @@ const ExpenseSchema = new mongoose.Schema(
       default: "Other",
     },
 
-    expenseType: {
-      type: String,
-      enum: [
-        "travel",
-        "meal",
-        "fuel",
-        "hotel",
-        "medical",
-        "office",
-        "internet",
-        "transport",
-        "other",
-      ],
-      required: true,
-    },
+  expenseType: {
+  type: String,
+  enum: [
+    "travel",
+    "fuel",
+    "meal",
+    "hotel",
+    "medical",
+    "office",
+    "internet",
+    "insurance",
+    "utilities",
+    "rent",
+    "software",
+    "marketing",
+    "transport",
+    "other",
+  ],
+  required: true,
+},
 
     amount: {
       type: Number,
@@ -63,7 +84,6 @@ const ExpenseSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // ✅ FIX: NOT required anymore
     receiptUrl: {
       type: String,
       default: "",
@@ -75,7 +95,6 @@ const ExpenseSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // ✅ FIX: NOT required anymore
     incurredByName: {
       type: String,
       default: "",
@@ -88,12 +107,24 @@ const ExpenseSchema = new mongoose.Schema(
       default: "self",
     },
 
-    paidBy: {
-      type: String,
-      enum: ["employee", "company"],
-      required: true,
-      default: "employee",
-    },
+   paidBy: {
+  type: String,
+  enum: ["company", "employee"],
+  required: true,
+  default: "company",
+},
+
+paidByEmployeeId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  default: null,
+},
+
+paidByName: {
+  type: String,
+  default: "",
+  trim: true,
+},
 
     expenseDate: {
       type: Date,
@@ -143,29 +174,43 @@ const ExpenseSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+
     evidence: [
+      {
+        url: {
+          type: String,
+          required: true,
+        },
+
+        fileName: {
+          type: String,
+          default: "",
+        },
+
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+
+        uploadedByRole: {
+          type: String,
+          enum: ["admin", "employee"],
+        },
+
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+  },
   {
-    url: { type: String, required: true },
-    fileName: { type: String, default: "" },
-    uploadedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-    uploadedByRole: {
-      type: String,
-      enum: ["admin", "employee"],
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now,
-    },
-  },
-],
-  },
-  { timestamps: true }
+    timestamps: true,
+  }
 );
 
 const Expense =
-  mongoose.models.Expense || mongoose.model("Expense", ExpenseSchema);
+  mongoose.models.Expense ||
+  mongoose.model("Expense", ExpenseSchema);
 
 export default Expense;

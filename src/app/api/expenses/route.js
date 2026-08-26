@@ -3,20 +3,44 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Expense from "@/models/Expense";
 import User from "@/models/User";
+import { generateExpenseId } from "@/lib/expenseId";
 import mongoose from "mongoose";
+import {
+  sendExpenseSubmittedEmail,
+} from "@/lib/email";
 
 /* ================================
-   🔹 VALIDATION (UPDATED)
+   🔹 VALIDATION
 ================================ */
 
 function isValidReceipt(value) {
   if (!value || typeof value !== "string") return false;
 
-  // ✅ ONLY allow Cloudinary URLs
   return (
     value.startsWith("https://res.cloudinary.com/") ||
     value.startsWith("http://res.cloudinary.com/")
   );
+}
+
+/* ================================
+   🔹 DATE RANGE
+   Used for duplicate checking
+================================ */
+
+function getExpenseDateRange(date) {
+  const value = new Date(date);
+
+  if (Number.isNaN(value.getTime())) {
+    return null;
+  }
+
+  const start = new Date(value);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(value);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
 }
 
 /* ================================
@@ -28,7 +52,10 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+      return Response.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     await connectDB();
@@ -36,41 +63,70 @@ export async function GET() {
     let query = {};
 
     if (session.user.role === "admin") {
-      // ✅ admin → sab dekh sakta hai
+      // Admin can see all expenses
       query = {};
     } else {
-      // ✅ employee → sirf apne expenses
+      // Employee sees expenses belonging to them
       query = {
-        createdBy: session.user.id,
+        employeeId: session.user.id,
       };
     }
 
     const items = await Expense.find(query)
-      .populate("createdBy", "name role")
+      .populate(
+        "createdBy",
+        "name role email"
+      )
+      .populate(
+        "employeeId",
+        "name employeeId email"
+      )
+      .populate(
+        "paidByEmployeeId",
+        "name employeeId email"
+      )
       .sort({ createdAt: -1 });
 
     return Response.json({ items });
 
   } catch (error) {
-    console.error("GET /api/expenses error:", error);
+    console.error(
+      "GET /api/expenses error:",
+      error
+    );
+
     return Response.json(
-      { error: error.message },
+      {
+        error:
+          error.message ||
+          "Failed to load expenses",
+      },
       { status: 500 }
     );
   }
 }
 
 /* ================================
-   🔹 POST (UPDATED)
+   🔹 POST
 ================================ */
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    /* ================================
+       🔹 AUTHENTICATION
+    ================================= */
 
-    if (!session || !["employee", "admin"].includes(session.user.role)) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+    const session =
+      await getServerSession(authOptions);
+
+    if (
+      !session ||
+      !["employee", "admin"].includes(
+        session.user.role
+      )
+    ) {
+      return Response.json(
+        { error: "Unauthorized" },
         { status: 401 }
       );
     }
@@ -89,65 +145,282 @@ export async function POST(req) {
       incurredByName,
       incurredFor,
       paidBy,
+      paidByEmployeeId,
       employeeId,
     } = body;
 
     /* ================================
-       🔹 VALIDATION
+       🔹 BASIC VALIDATION
     ================================= */
 
-    if (!category || !amount) {
-      return new Response(
-        JSON.stringify({ error: "Category and amount are required" }),
+    if (
+      !category ||
+      amount === undefined ||
+      amount === null ||
+      amount === ""
+    ) {
+      return Response.json(
+        {
+          error:
+            "Category and amount are required",
+        },
         { status: 400 }
       );
     }
 
-   
- // Optional validation (lenient)
-if (receiptUrl && !receiptUrl.startsWith("http")) {
-  return Response.json(
-    { error: "Invalid receipt URL" },
-    { status: 400 }
-  );
-}
+    const numericAmount = Number(amount);
+
+    if (
+      !Number.isFinite(numericAmount) ||
+      numericAmount < 0
+    ) {
+      return Response.json(
+        {
+          error:
+            "Amount must be a valid non-negative number",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* ================================
+       🔹 EXPENSE DATE VALIDATION
+    ================================= */
+
+    const finalExpenseDate =
+      expenseDate || new Date();
+
+    const expenseDateObject =
+      new Date(finalExpenseDate);
+
+    if (
+      Number.isNaN(
+        expenseDateObject.getTime()
+      )
+    ) {
+      return Response.json(
+        {
+          error: "Invalid expense date",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* ================================
+       🔹 RECEIPT VALIDATION
+    ================================= */
+
+    if (
+      receiptUrl &&
+      !isValidReceipt(receiptUrl)
+    ) {
+      return Response.json(
+        {
+          error: "Invalid receipt URL",
+        },
+        { status: 400 }
+      );
+    }
 
     /* ================================
        🔹 EMPLOYEE RESOLUTION
     ================================= */
 
-    let empId, empName, empCode;
+    let empId = null;
+    let empName = "Company";
+    let empCode = "COMPANY";
 
-    if (session.user.role === "admin") {
+    /* --------------------------------
+       EMPLOYEE SUBMISSION
+    -------------------------------- */
+
+    if (
+      session.user.role === "employee"
+    ) {
+      const employee =
+        await User.findById(
+          session.user.id
+        ).select(
+          "_id name employeeId email role"
+        );
+
+      if (!employee) {
+        return Response.json(
+          {
+            error:
+              "Employee account not found",
+          },
+          { status: 404 }
+        );
+      }
+
+      empId = employee._id;
+      empName = employee.name;
+      empCode = employee.employeeId;
+    }
+
+    /* --------------------------------
+       ADMIN SUBMISSION
+    -------------------------------- */
+
+    if (
+      session.user.role === "admin"
+    ) {
       if (employeeId) {
-        const emp = await User.findById(employeeId);
+        // Admin is creating an expense FOR an employee.
 
-        if (!emp) {
-          return new Response(
-            JSON.stringify({ error: "Employee not found" }),
+        if (
+          !mongoose.Types.ObjectId.isValid(
+            employeeId
+          )
+        ) {
+          return Response.json(
+            {
+              error:
+                "Invalid employee ID",
+            },
+            { status: 400 }
+          );
+        }
+
+        const employee =
+          await User.findById(
+            employeeId
+          ).select(
+            "_id name employeeId email role"
+          );
+
+        if (!employee) {
+          return Response.json(
+            {
+              error:
+                "Employee not found",
+            },
             { status: 404 }
           );
         }
 
-        empId = emp._id;
-        empName = emp.name;
-        empCode = emp.employeeId;
+        empId = employee._id;
+        empName = employee.name;
+        empCode = employee.employeeId;
+
       } else {
-        // Company expense
+        // No employee selected = company expense.
+
         empId = null;
         empName = "Company";
         empCode = "COMPANY";
       }
-    } else {
-      const emp = await User.findById(session.user.id);
-
-      empId = emp._id;
-      empName = emp.name;
-      empCode = emp.employeeId;
     }
 
     /* ================================
-       🔹 EVIDENCE (UPDATED)
+       🔹 OWNER TYPE
+    ================================= */
+
+    const expenseOwnerType = empId
+      ? "employee"
+      : "company";
+
+    /* ================================
+       🔹 FINAL CATEGORY
+    ================================= */
+
+    const finalCategory = String(
+      category
+    )
+      .trim()
+      .toLowerCase();
+
+    /* ================================
+       🔹 DUPLICATE EXPENSE CHECK
+    ================================= */
+
+    const dateRange =
+      getExpenseDateRange(
+        expenseDateObject
+      );
+
+    if (!dateRange) {
+      return Response.json(
+        {
+          error:
+            "Unable to determine expense date",
+        },
+        { status: 400 }
+      );
+    }
+
+    const duplicateQuery = {
+      category: finalCategory,
+
+      amount: numericAmount,
+
+      expenseDate: {
+        $gte: dateRange.start,
+        $lte: dateRange.end,
+      },
+
+      expenseOwnerType,
+    };
+
+    if (empId) {
+      duplicateQuery.employeeId =
+        empId;
+    } else {
+      duplicateQuery.employeeId = null;
+    }
+
+    const duplicateExpense =
+      await Expense.findOne(
+        duplicateQuery
+      )
+        .sort({
+          createdAt: -1,
+        })
+        .select(
+          "expenseId category amount expenseDate employeeName status"
+        );
+
+    if (duplicateExpense) {
+      return Response.json(
+        {
+          error:
+            "A similar expense already exists for this date.",
+          duplicate: {
+            expenseId:
+              duplicateExpense.expenseId,
+            category:
+              duplicateExpense.category,
+            amount:
+              duplicateExpense.amount,
+            expenseDate:
+              duplicateExpense.expenseDate,
+            employeeName:
+              duplicateExpense.employeeName,
+            status:
+              duplicateExpense.status,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
+    /* ================================
+       🔹 EXPENSE ID
+    ================================= */
+
+    const { expenseId } =
+      await generateExpenseId({
+        employeeId: empId,
+        employeeName: empName,
+        employeeCode: empCode,
+        expenseOwnerType,
+        expenseDate:
+          expenseDateObject,
+      });
+
+    /* ================================
+       🔹 EVIDENCE
     ================================= */
 
     const evidence = [];
@@ -155,70 +428,257 @@ if (receiptUrl && !receiptUrl.startsWith("http")) {
     if (receiptUrl) {
       evidence.push({
         url: receiptUrl,
-        fileName: receiptFileName || "",
-        uploadedBy: new mongoose.Types.ObjectId(session.user.id),
-        uploadedByRole: session.user.role,
+
+        fileName:
+          receiptFileName || "",
+
+        uploadedBy:
+          new mongoose.Types.ObjectId(
+            session.user.id
+          ),
+
+        uploadedByRole:
+          session.user.role,
+
         uploadedAt: new Date(),
       });
     }
 
     /* ================================
-       🔹 CREATE
+       🔹 PAID BY RESOLUTION
     ================================= */
 
-    const finalCategory = category.toLowerCase();
+    let finalPaidBy = "company";
 
-    const item = await Expense.create({
-  employeeId: empId,
-  employeeName: empName,
-  employeeCode: empCode,
+    let finalPaidByEmployeeId = null;
 
-  expenseOwnerType:
-    session.user.role === "admin" ? "company" : "employee",
+    let finalPaidByName = "Company";
 
-  category: finalCategory,
-  expenseType: finalCategory,
+    /* --------------------------------
+       COMPANY PAID
+    -------------------------------- */
 
-  amount: Number(amount),
-  companyExpenseAmount: Number(amount),
+    if (
+      !paidBy ||
+      paidBy === "company"
+    ) {
+      finalPaidBy = "company";
 
-  description: description || "",
+      finalPaidByEmployeeId = null;
 
-  incurredByName: incurredByName || empName,
-  incurredFor: incurredFor || "self",
+      finalPaidByName = "Company";
+    }
 
-  paidBy: paidBy || "company",
+    /* --------------------------------
+       EMPLOYEE PAID
+    -------------------------------- */
 
-  status: "submitted",
-  submittedAt: new Date(),
+    if (paidBy === "employee") {
+      if (!paidByEmployeeId) {
+        return Response.json(
+          {
+            error:
+              "Please select the employee who paid this expense",
+          },
+          { status: 400 }
+        );
+      }
 
-  createdBy: session.user.id,
-  updatedBy: session.user.id,
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          paidByEmployeeId
+        )
+      ) {
+        return Response.json(
+          {
+            error:
+              "Invalid paid-by employee ID",
+          },
+          { status: 400 }
+        );
+      }
 
-  evidence,
+      const paidByEmployee =
+        await User.findById(
+          paidByEmployeeId
+        ).select(
+          "_id name employeeId"
+        );
 
-  // 🔥 FINAL FIX
-  receiptUrl: receiptUrl || (evidence[0]?.url || ""),
-  receiptFileName: receiptFileName || (evidence[0]?.fileName || ""),
+      if (!paidByEmployee) {
+        return Response.json(
+          {
+            error:
+              "Paid-by employee not found",
+          },
+          { status: 404 }
+        );
+      }
 
-  expenseDate,
-});
+      finalPaidBy = "employee";
 
-    return new Response(
-      JSON.stringify({
-        message: "Expense submitted successfully",
+      finalPaidByEmployeeId =
+        paidByEmployee._id;
+
+      finalPaidByName =
+        paidByEmployee.name;
+    }
+
+    /* ================================
+       🔹 INVALID PAID BY
+    ================================= */
+
+    if (
+      !["company", "employee"].includes(
+        finalPaidBy
+      )
+    ) {
+      return Response.json(
+        {
+          error:
+            "Invalid paid by value",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* ================================
+       🔹 CREATE EXPENSE
+    ================================= */
+
+    const item =
+      await Expense.create({
+        expenseId,
+
+        employeeId: empId,
+
+        employeeName: empName,
+
+        employeeCode: empCode,
+
+        // Owner is determined by employeeId
+        // NOT by who created the record.
+        expenseOwnerType,
+
+        category: finalCategory,
+
+        expenseType: finalCategory,
+
+        amount: numericAmount,
+
+        companyExpenseAmount:
+          numericAmount,
+
+        description:
+          description || "",
+
+        incurredByName:
+          incurredByName ||
+          empName,
+
+        incurredFor:
+          incurredFor ||
+          (expenseOwnerType ===
+          "company"
+            ? "company"
+            : "self"),
+
+        /* =========================
+           PAID BY
+        ========================= */
+
+        paidBy:
+          finalPaidBy,
+
+        paidByEmployeeId:
+          finalPaidByEmployeeId,
+
+        paidByName:
+          finalPaidByName,
+
+        /* =========================
+           STATUS
+        ========================= */
+
+        status: "submitted",
+
+        submittedAt: new Date(),
+
+        /* =========================
+           AUDIT
+        ========================= */
+
+        createdBy:
+          session.user.id,
+
+        updatedBy:
+          session.user.id,
+
+        /* =========================
+           EVIDENCE
+        ========================= */
+
+        evidence,
+
+        receiptUrl:
+          receiptUrl ||
+          evidence[0]?.url ||
+          "",
+
+        receiptFileName:
+          receiptFileName ||
+          evidence[0]?.fileName ||
+          "",
+
+        /* =========================
+           DATE
+        ========================= */
+
+        expenseDate:
+          expenseDateObject,
+      });
+
+      /* ================================
+   🔹 EMAIL NOTIFICATION
+================================ */
+
+try {
+  await sendExpenseSubmittedEmail(item);
+} catch (emailError) {
+  console.error(
+    "Expense email notification failed:",
+    emailError
+  );
+}
+    /* ================================
+       🔹 RESPONSE
+    ================================= */
+
+    return Response.json(
+      {
+        message:
+          "Expense submitted successfully",
+
+        expenseId:
+          item.expenseId,
+
         item,
-      }),
-      { status: 200 }
+      },
+      { status: 201 }
     );
 
   } catch (error) {
-    console.error("POST /api/expenses error:", error);
+    console.error(
+      "POST /api/expenses error:",
+      error
+    );
 
-    return new Response(
-      JSON.stringify({
-        error: error.message || "Failed to create expense",
-      }),
+    return Response.json(
+      {
+        error:
+          error.message ||
+          "Failed to create expense",
+      },
       { status: 500 }
     );
   }
