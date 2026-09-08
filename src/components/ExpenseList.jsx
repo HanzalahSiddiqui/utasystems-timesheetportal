@@ -134,6 +134,22 @@ export default function ExpenseList({
   }
 
   /* ================================
+     CATEGORY DISPLAY
+  ================================= */
+
+  function getCategoryDisplay(item) {
+    if (item.category === "other") {
+      if (item.otherExpenseType) {
+        return `Other — ${item.otherExpenseType}`;
+      }
+
+      return "Other";
+    }
+
+    return item.category || "-";
+  }
+
+  /* ================================
      DELETE PERMISSION
   ================================= */
 
@@ -155,9 +171,9 @@ export default function ExpenseList({
     */
 
     return [
-  "draft",
-  "submitted",
-].includes(item.status);
+      "draft",
+      "submitted",
+    ].includes(item.status);
   }
 
   /* ================================
@@ -369,8 +385,8 @@ export default function ExpenseList({
                         CATEGORY
                     ========================== */}
 
-                    <td className="px-4 py-4 capitalize">
-                      {item.category}
+                    <td className="px-4 py-4">
+                      {getCategoryDisplay(item)}
                     </td>
 
                     {/* =========================

@@ -76,8 +76,16 @@ export async function sendExpenseSubmittedEmail(
   const expenseId =
     expense.expenseId || "-";
 
+  /* =========================================
+     CATEGORY DISPLAY
+  ========================================= */
+
   const category =
-    expense.category || "-";
+    expense.category === "other"
+      ? expense.otherExpenseType
+        ? `Other — ${expense.otherExpenseType}`
+        : "Other"
+      : expense.category || "-";
 
   const amount = Number(
     expense.amount || 0

@@ -137,6 +137,7 @@ export async function POST(req) {
 
     const {
       category,
+      otherExpenseType,
       amount,
       description,
       expenseDate,
@@ -181,6 +182,40 @@ export async function POST(req) {
         },
         { status: 400 }
       );
+    }
+
+    /* ================================
+       🔹 FINAL CATEGORY
+    ================================= */
+
+    const finalCategory = String(
+      category
+    )
+      .trim()
+      .toLowerCase();
+
+    /* ================================
+       🔹 OTHER EXPENSE TYPE
+    ================================= */
+
+    let finalOtherExpenseType = "";
+
+    if (finalCategory === "other") {
+      if (
+        !otherExpenseType ||
+        !String(otherExpenseType).trim()
+      ) {
+        return Response.json(
+          {
+            error:
+              "Please specify the expense type when category is Other",
+          },
+          { status: 400 }
+        );
+      }
+
+      finalOtherExpenseType =
+        String(otherExpenseType).trim();
     }
 
     /* ================================
@@ -320,16 +355,6 @@ export async function POST(req) {
     const expenseOwnerType = empId
       ? "employee"
       : "company";
-
-    /* ================================
-       🔹 FINAL CATEGORY
-    ================================= */
-
-    const finalCategory = String(
-      category
-    )
-      .trim()
-      .toLowerCase();
 
     /* ================================
        🔹 DUPLICATE EXPENSE CHECK
@@ -564,6 +589,9 @@ export async function POST(req) {
 
         expenseType: finalCategory,
 
+        otherExpenseType:
+          finalOtherExpenseType,
+
         amount: numericAmount,
 
         companyExpenseAmount:
@@ -638,18 +666,19 @@ export async function POST(req) {
           expenseDateObject,
       });
 
-      /* ================================
-   🔹 EMAIL NOTIFICATION
-================================ */
+    /* ================================
+       🔹 EMAIL NOTIFICATION
+    ================================= */
 
-try {
-  await sendExpenseSubmittedEmail(item);
-} catch (emailError) {
-  console.error(
-    "Expense email notification failed:",
-    emailError
-  );
-}
+    try {
+      await sendExpenseSubmittedEmail(item);
+    } catch (emailError) {
+      console.error(
+        "Expense email notification failed:",
+        emailError
+      );
+    }
+
     /* ================================
        🔹 RESPONSE
     ================================= */

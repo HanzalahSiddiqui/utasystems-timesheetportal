@@ -65,6 +65,11 @@ const ExpenseSchema = new mongoose.Schema(
   ],
   required: true,
 },
+otherExpenseType: {
+  type: String,
+  default: "",
+  trim: true,
+},
 
     amount: {
       type: Number,

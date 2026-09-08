@@ -188,6 +188,7 @@ export async function PATCH(req, context) {
       const {
         expenseType,
         category,
+        otherExpenseType,
         amount,
         description,
         receiptUrl,
@@ -200,7 +201,9 @@ export async function PATCH(req, context) {
         submit,
       } = body;
 
-      /* CATEGORY */
+      /* ================================
+         CATEGORY
+      ================================= */
 
       if (category !== undefined) {
         item.category = String(category)
@@ -211,7 +214,9 @@ export async function PATCH(req, context) {
           item.category;
       }
 
-      /* EXPENSE TYPE */
+      /* ================================
+         EXPENSE TYPE
+      ================================= */
 
       if (
         expenseType !== undefined
@@ -222,7 +227,39 @@ export async function PATCH(req, context) {
             .toLowerCase();
       }
 
-      /* AMOUNT */
+      /* ================================
+         OTHER EXPENSE TYPE
+      ================================= */
+
+      if (
+        otherExpenseType !== undefined
+      ) {
+        const value = String(
+          otherExpenseType || ""
+        ).trim();
+
+        if (
+          item.category === "other" &&
+          !value
+        ) {
+          return Response.json(
+            {
+              error:
+                "Please specify the expense type",
+            },
+            { status: 400 }
+          );
+        }
+
+        item.otherExpenseType =
+          item.category === "other"
+            ? value
+            : "";
+      }
+
+      /* ================================
+         AMOUNT
+      ================================= */
 
       if (amount !== undefined) {
         const value = Number(amount);
@@ -245,7 +282,9 @@ export async function PATCH(req, context) {
           value;
       }
 
-      /* DESCRIPTION */
+      /* ================================
+         DESCRIPTION
+      ================================= */
 
       if (
         description !== undefined
@@ -256,7 +295,9 @@ export async function PATCH(req, context) {
           ).trim();
       }
 
-      /* EXPENSE DATE */
+      /* ================================
+         EXPENSE DATE
+      ================================= */
 
       if (
         expenseDate !== undefined
@@ -282,7 +323,9 @@ export async function PATCH(req, context) {
         item.expenseDate = date;
       }
 
-      /* INCURRED BY */
+      /* ================================
+         INCURRED BY
+      ================================= */
 
       if (
         incurredByName !== undefined
@@ -293,7 +336,9 @@ export async function PATCH(req, context) {
           ).trim();
       }
 
-      /* INCURRED FOR */
+      /* ================================
+         INCURRED FOR
+      ================================= */
 
       if (
         incurredFor !== undefined
@@ -480,6 +525,7 @@ export async function PATCH(req, context) {
     const {
       category,
       expenseType,
+      otherExpenseType,
       amount,
       description,
       receiptUrl,
@@ -536,6 +582,43 @@ export async function PATCH(req, context) {
 
       item.expenseType =
         finalExpenseType;
+    }
+
+    /* ================================
+       OTHER EXPENSE TYPE
+    ================================= */
+
+    if (
+      otherExpenseType !== undefined
+    ) {
+      const value = String(
+        otherExpenseType || ""
+      ).trim();
+
+      const finalCategory =
+        String(
+          item.category || ""
+        )
+          .trim()
+          .toLowerCase();
+
+      if (
+        finalCategory === "other" &&
+        !value
+      ) {
+        return Response.json(
+          {
+            error:
+              "Please specify the expense type",
+          },
+          { status: 400 }
+        );
+      }
+
+      item.otherExpenseType =
+        finalCategory === "other"
+          ? value
+          : "";
     }
 
     /* ================================
@@ -975,7 +1058,7 @@ export async function PATCH(req, context) {
 }
 
 /* ================================
-   🔹 DELETE
+   DELETE
 ================================ */
 
 export async function DELETE(req, context) {
@@ -1017,7 +1100,7 @@ export async function DELETE(req, context) {
       String(session.user.id);
 
     /* ================================
-       🔹 ADMIN
+       ADMIN
        Admin has full delete control
     ================================= */
 
@@ -1030,7 +1113,7 @@ export async function DELETE(req, context) {
     }
 
     /* ================================
-       🔹 EMPLOYEE OWNERSHIP
+       EMPLOYEE OWNERSHIP
     ================================= */
 
     if (!isOwner) {
@@ -1044,7 +1127,7 @@ export async function DELETE(req, context) {
     }
 
     /* ================================
-       🔹 EMPLOYEE STATUS CONTROL
+       EMPLOYEE STATUS CONTROL
        Employee can delete ONLY:
        - draft
        - submitted
@@ -1070,7 +1153,7 @@ export async function DELETE(req, context) {
     }
 
     /* ================================
-       🔹 DELETE
+       DELETE
     ================================= */
 
     await Expense.findByIdAndDelete(id);

@@ -6,6 +6,9 @@ export default function ExpenseFormEmployee({
   onSaved = () => {},
 }) {
   const [category, setCategory] = useState("");
+  const [otherExpenseType, setOtherExpenseType] =
+    useState("");
+
   const [amount, setAmount] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
   const [description, setDescription] = useState("");
@@ -162,6 +165,20 @@ export default function ExpenseFormEmployee({
       return;
     }
 
+    /* =========================
+       OTHER EXPENSE VALIDATION
+    ========================= */
+
+    if (
+      category === "other" &&
+      !otherExpenseType.trim()
+    ) {
+      alert(
+        "Please specify the expense type"
+      );
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -176,6 +193,16 @@ export default function ExpenseFormEmployee({
 
           body: JSON.stringify({
             category,
+
+            /* =========================
+               OTHER EXPENSE TYPE
+            ========================= */
+
+            otherExpenseType:
+              category === "other"
+                ? otherExpenseType.trim()
+                : "",
+
             amount,
             description,
             expenseDate,
@@ -236,6 +263,9 @@ export default function ExpenseFormEmployee({
       ================================= */
 
       setCategory("");
+
+      setOtherExpenseType("");
+
       setAmount("");
       setExpenseDate("");
       setDescription("");
@@ -398,6 +428,38 @@ export default function ExpenseFormEmployee({
       </div>
 
       {/* ================================
+          OTHER EXPENSE TYPE
+      ================================= */}
+
+      {category === "other" && (
+        <div>
+          <label className="text-sm font-medium text-slate-700 block mb-1">
+            Specify Expense Type
+          </label>
+
+          <input
+            type="text"
+            value={otherExpenseType}
+            onChange={(e) =>
+              setOtherExpenseType(
+                e.target.value
+              )
+            }
+            placeholder="e.g. Professional Certification, Rental, Training"
+            className="border rounded px-3 py-2 w-full"
+            required
+            disabled={
+              saving || uploading
+            }
+          />
+
+          <p className="text-xs text-slate-500 mt-1">
+            Please specify the type of expense.
+          </p>
+        </div>
+      )}
+
+      {/* ================================
           DATE + PAID BY
       ================================= */}
 
@@ -477,10 +539,6 @@ export default function ExpenseFormEmployee({
           readOnly
           className="border rounded px-3 py-2 w-full bg-slate-50 text-slate-600"
         />
-
-        {/* <p className="text-xs text-slate-500 mt-1">
-          Automatically set to the current employee.
-        </p> */}
       </div>
 
       {/* ================================

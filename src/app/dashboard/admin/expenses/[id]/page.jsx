@@ -30,6 +30,9 @@ export default function AdminExpenseDetailPage() {
   ================================= */
 
   const [category, setCategory] = useState("");
+  const [otherExpenseType, setOtherExpenseType] =
+    useState("");
+
   const [expenseType, setExpenseType] = useState("");
   const [amount, setAmount] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
@@ -85,6 +88,10 @@ export default function AdminExpenseDetailPage() {
 
       setCategory(
         expense.category || ""
+      );
+
+      setOtherExpenseType(
+        expense.otherExpenseType || ""
       );
 
       setExpenseType(
@@ -276,6 +283,20 @@ export default function AdminExpenseDetailPage() {
     if (saving || uploading) return;
 
     /* --------------------------------
+       OTHER EXPENSE VALIDATION
+    -------------------------------- */
+
+    if (
+      category === "other" &&
+      !otherExpenseType.trim()
+    ) {
+      alert(
+        "Please specify the expense type when category is Other"
+      );
+      return;
+    }
+
+    /* --------------------------------
        PAID BY VALIDATION
     -------------------------------- */
 
@@ -316,6 +337,12 @@ export default function AdminExpenseDetailPage() {
           },
           body: JSON.stringify({
             category,
+
+            otherExpenseType:
+              category === "other"
+                ? otherExpenseType.trim()
+                : "",
+
             expenseType,
             amount,
             description,
@@ -821,6 +848,36 @@ export default function AdminExpenseDetailPage() {
                     </option>
                   </select>
                 </div>
+
+                {/* OTHER EXPENSE TYPE */}
+
+                {category === "other" && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Specify Expense Type
+                    </label>
+
+                    <input
+                      type="text"
+                      value={otherExpenseType}
+                      onChange={(e) =>
+                        setOtherExpenseType(
+                          e.target.value
+                        )
+                      }
+                      placeholder="e.g. Professional Certification, Rental, Training"
+                      className="w-full rounded-lg border px-3 py-2"
+                      disabled={
+                        saving ||
+                        uploading
+                      }
+                    />
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Required when category is Other.
+                    </p>
+                  </div>
+                )}
 
                 {/* AMOUNT */}
 
