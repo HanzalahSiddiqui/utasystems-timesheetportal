@@ -60,6 +60,8 @@ export async function POST(req) {
       clientPerDayRate,
       clientPerHourRate,
       clientOtRatePerHour,
+      clientCurrency,
+      cadToUsdRate,
       payrollEnabled,
       annualGrossSalary,
       numberOfDependents,
@@ -106,6 +108,15 @@ export async function POST(req) {
     }
     if (!Number.isFinite(Number(perDayRate ?? 0)) || Number(perDayRate ?? 0) < 0 || !Number.isFinite(Number(perHourRate ?? 0)) || Number(perHourRate ?? 0) < 0) {
       return Response.json({ error: "Employee rates must be valid non-negative amounts" }, { status: 400 });
+    }
+
+    if (clientCurrency !== undefined && !["USD", "CAD"].includes(clientCurrency)) {
+      return Response.json({ error: "Client currency must be USD or CAD" }, { status: 400 });
+    }
+    const normalizedClientCurrency = clientCurrency === "CAD" ? "CAD" : "USD";
+    const normalizedCadToUsdRate = normalizedClientCurrency === "CAD" ? Number(cadToUsdRate) : 1;
+    if (!Number.isFinite(normalizedCadToUsdRate) || normalizedCadToUsdRate <= 0) {
+      return Response.json({ error: "Enter a valid CAD to USD exchange rate greater than 0" }, { status: 400 });
     }
 
     const annualSalary = Number(annualGrossSalary ?? 0);
@@ -187,6 +198,8 @@ const monthlySalary =
       clientPerDayRate: payType === "daily" ? clientPerDayRate : 0,
       clientPerHourRate: payType === "hourly" ? clientPerHourRate : 0,
       clientOtRatePerHour,
+      clientCurrency: normalizedClientCurrency,
+      cadToUsdRate: normalizedCadToUsdRate,
     }, `${(joiningDate || getBusinessDate()).slice(0, 7)}-01`);
 
     const user = await User.create({
@@ -215,6 +228,8 @@ const monthlySalary =
       clientPerDayRate: payType === "daily" ? Number(clientPerDayRate || 0) : 0,
       clientPerHourRate: payType === "hourly" ? Number(clientPerHourRate || 0) : 0,
       clientOtRatePerHour: Number(clientOtRatePerHour || 0),
+      clientCurrency: normalizedClientCurrency,
+      cadToUsdRate: normalizedCadToUsdRate,
       compensationHistory: [initialCompensation],
 
       payrollEnabled: payrollEnabled !== undefined ? !!payrollEnabled : true,

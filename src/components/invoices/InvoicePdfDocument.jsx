@@ -233,8 +233,9 @@ function safeDate(value) {
   });
 }
 
-function money(value) {
-  return Number(value || 0).toFixed(2);
+function money(value, currency = "USD") {
+  const amount = Number(value || 0).toFixed(2);
+  return currency === "CAD" ? `CAD $${amount}` : `$${amount}`;
 }
 
 export default function InvoicePdfDocument({ item }) {
@@ -325,15 +326,21 @@ export default function InvoicePdfDocument({ item }) {
           <View style={styles.row}>
             <Text style={styles.leftCell}>Professional Service Charges:</Text>
             <Text style={styles.rightCell}>
-              ${money(data.professionalServiceCharges)}
+              {money(data.professionalServiceCharges, data.currency)}
             </Text>
           </View>
 
           <View style={styles.lastRow}>
             <Text style={styles.totalLabel}>TOTAL DUE:</Text>
-            <Text style={styles.totalValue}>${money(data.totalDue)}</Text>
+            <Text style={styles.totalValue}>{money(data.totalDue, data.currency)}</Text>
           </View>
         </View>
+
+        {data.currency === "CAD" ? (
+          <Text style={{ marginTop: 8, fontSize: 9, color: "#475569", textAlign: "right" }}>
+            Exchange rate: 1 CAD = {Number(data.exchangeRateToUSD || 0).toFixed(4)} USD · USD equivalent: ${Number(data.usdEquivalent || 0).toFixed(2)}
+          </Text>
+        ) : null}
 
         <View style={styles.bottomBar} fixed />
 

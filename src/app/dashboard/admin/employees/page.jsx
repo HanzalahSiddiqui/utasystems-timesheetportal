@@ -151,6 +151,8 @@ const [form, setForm] = useState({
   clientPerDayRate: employee.clientPerDayRate ?? "",
   clientPerHourRate: employee.clientPerHourRate ?? "",
   clientOtRatePerHour: employee.clientOtRatePerHour ?? "",
+  clientCurrency: employee.clientCurrency || "USD",
+  cadToUsdRate: employee.cadToUsdRate ?? 1,
   payrollEnabled: employee.payrollEnabled ?? true,
   annualGrossSalary: employee.annualGrossSalary ?? "",
 monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
@@ -501,7 +503,7 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
             >
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {form.payType === "daily" ? (
-                  <Field label="Client / PO Per Day Rate">
+                  <Field label={`Client / PO Per Day Rate (${form.clientCurrency})`}>
                     <Input
                       type="number"
                       min="0"
@@ -513,7 +515,7 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                     />
                   </Field>
                 ) : (
-                  <Field label="Client / PO Per Hour Rate">
+                  <Field label={`Client / PO Per Hour Rate (${form.clientCurrency})`}>
                     <Input
                       type="number"
                       min="0"
@@ -526,7 +528,7 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                   </Field>
                 )}
 
-                <Field label="Client / PO OT Rate">
+                <Field label={`Client / PO OT Rate (${form.clientCurrency})`}>
                   <Input
                     type="number"
                     min="0"
@@ -540,6 +542,18 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                     }
                   />
                 </Field>
+                <Field label="PO / invoice currency">
+                  <Select value={form.clientCurrency} onChange={(e) => setForm({ ...form, clientCurrency: e.target.value })}>
+                    <option value="USD">USD — US Dollar</option>
+                    <option value="CAD">CAD — Canadian Dollar</option>
+                  </Select>
+                </Field>
+                {form.clientCurrency === "CAD" && (
+                  <Field label="CAD to USD exchange rate">
+                    <Input type="number" min="0.000001" step="0.000001" value={form.cadToUsdRate} onChange={(e) => setForm({ ...form, cadToUsdRate: e.target.value })} required />
+                    <p className="mt-1 text-xs text-slate-500">USD value of 1 CAD for this effective month. This rate is saved with payroll and invoice records.</p>
+                  </Field>
+                )}
               </div>
             </SectionCard>
           </div>
@@ -610,8 +624,9 @@ function EmployeeMobileCard({ emp, onEdit, onToggleStatus, onDelete }) {
           <InfoPair label="Monthly gross" value={`$${monthlyGross.toLocaleString()}`} />
           <InfoPair label="Employee rate" value={employeeRate} />
           <InfoPair label="Employee OT rate" value={emp.otRatePerHour ?? 0} />
-          <InfoPair label="Client / PO rate" value={emp.payType === "hourly" ? `Hourly: ${emp.clientPerHourRate ?? 0}` : `Daily: ${emp.clientPerDayRate ?? 0}`} />
-          <InfoPair label="Client / PO OT" value={emp.clientOtRatePerHour ?? 0} />
+          <InfoPair label="Client / PO rate" value={emp.payType === "hourly" ? `Hourly: ${emp.clientCurrency === "CAD" ? "CAD $" : "$"}${emp.clientPerHourRate ?? 0}` : `Daily: ${emp.clientCurrency === "CAD" ? "CAD $" : "$"}${emp.clientPerDayRate ?? 0}`} />
+          <InfoPair label="PO currency / USD rate" value={emp.clientCurrency === "CAD" ? `CAD · 1 CAD = ${Number(emp.cadToUsdRate || 0).toFixed(4)} USD` : "USD"} />
+          <InfoPair label="Client / PO OT" value={`${emp.clientCurrency === "CAD" ? "CAD $" : "$"}${emp.clientOtRatePerHour ?? 0}`} />
           <InfoPair label="Access status" value={emp.status || "active"} />
           {emp.revocationReason && <InfoPair label="Revocation reason" value={emp.revocationReason} />}
         </div>
@@ -823,6 +838,8 @@ export default function EmployeesPage() {
     clientPerDayRate: "",
     clientPerHourRate: "",
     clientOtRatePerHour: "",
+    clientCurrency: "USD",
+    cadToUsdRate: "1",
     annualGrossSalary: "",
 monthlyGrossSalary: "",
     payrollEnabled: true,
@@ -910,6 +927,8 @@ monthlyGrossSalary: "",
           form.clientOtRatePerHour !== ""
             ? Number(form.clientOtRatePerHour)
             : 0,
+        clientCurrency: form.clientCurrency,
+        cadToUsdRate: form.clientCurrency === "CAD" ? Number(form.cadToUsdRate || 0) : 1,
       };
 
       const res = await fetch("/api/employees", {
@@ -956,6 +975,8 @@ monthlyGrossSalary: "",
         clientPerDayRate: "",
         clientPerHourRate: "",
         clientOtRatePerHour: "",
+        clientCurrency: "USD",
+        cadToUsdRate: "1",
 annualGrossSalary: "",
 monthlyGrossSalary: "",
 payrollEnabled: true,
@@ -1541,7 +1562,7 @@ useEffect(() => {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           {form.payType === "daily" && (
-            <Field label="Client / PO Per Day Rate">
+            <Field label={`Client / PO Per Day Rate (${form.clientCurrency})`}>
               <Input
                 type="number"
                 min="0"
@@ -1558,7 +1579,7 @@ useEffect(() => {
           )}
 
           {form.payType === "hourly" && (
-            <Field label="Client / PO Per Hour Rate">
+            <Field label={`Client / PO Per Hour Rate (${form.clientCurrency})`}>
               <Input
                 type="number"
                 min="0"
@@ -1574,7 +1595,7 @@ useEffect(() => {
             </Field>
           )}
 
-          <Field label="Client / PO OT Rate">
+          <Field label={`Client / PO OT Rate (${form.clientCurrency})`}>
             <Input
               type="number"
               min="0"
@@ -1588,6 +1609,19 @@ useEffect(() => {
               }
             />
           </Field>
+
+          <Field label="PO / invoice currency">
+            <Select value={form.clientCurrency} onChange={(e) => setForm({ ...form, clientCurrency: e.target.value })}>
+              <option value="USD">USD — US Dollar</option>
+              <option value="CAD">CAD — Canadian Dollar</option>
+            </Select>
+          </Field>
+          {form.clientCurrency === "CAD" && (
+            <Field label="CAD to USD exchange rate">
+              <Input type="number" min="0.000001" step="0.000001" value={form.cadToUsdRate} onChange={(e) => setForm({ ...form, cadToUsdRate: e.target.value })} required />
+              <p className="mt-1 text-xs text-slate-500">USD value of 1 CAD for this effective month. Payroll margin uses the USD equivalent; invoices remain in CAD.</p>
+            </Field>
+          )}
 
           <Field label="Payroll Status">
             <label className="flex h-[46px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4">

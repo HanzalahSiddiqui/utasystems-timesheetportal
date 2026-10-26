@@ -78,6 +78,11 @@ const PayrollSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    clientCurrency: { type: String, enum: ["USD", "CAD"], default: "USD" },
+    exchangeRateToUSD: { type: Number, default: 1, min: 0 },
+    poRegularAmountOriginal: { type: Number, default: 0, min: 0 },
+    poOtAmountOriginal: { type: Number, default: 0, min: 0 },
+    poAmountOriginal: { type: Number, default: 0, min: 0 },
 
     totalWeekdays: {
       type: Number,

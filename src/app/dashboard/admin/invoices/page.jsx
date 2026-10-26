@@ -33,6 +33,11 @@ function StatusBadge({ status }) {
   );
 }
 
+function formatAmount(value, currency = "USD") {
+  const amount = Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return currency === "CAD" ? `CAD $${amount}` : `$${amount}`;
+}
+
 export default function InvoicesPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -178,12 +183,15 @@ export default function InvoicesPage() {
     return filteredItems.reduce(
       (acc, item) => {
         acc.totalInvoices += 1;
-        acc.totalAmount += Number(item.totalDue || 0);
+        const currency = item.currency === "CAD" ? "CAD" : "USD";
+        acc.amounts[currency] = (acc.amounts[currency] || 0) + Number(item.totalDue || 0);
+        acc.usdEquivalent += Number(item.usdEquivalent ?? item.totalDue ?? 0);
         return acc;
       },
       {
         totalInvoices: 0,
-        totalAmount: 0,
+        amounts: {},
+        usdEquivalent: 0,
       }
     );
   }, [filteredItems]);
@@ -234,7 +242,7 @@ export default function InvoicesPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <SummaryCard title="Total Invoices" value={summary.totalInvoices} />
-              <SummaryCard title="Total Amount" value={summary.totalAmount.toFixed(2)} />
+              <SummaryCard title="Total Due by Currency" value={Object.entries(summary.amounts).map(([currency, amount]) => formatAmount(amount, currency)).join(" · ") || "$0.00"} />
             </div>
 
             <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
@@ -365,11 +373,11 @@ export default function InvoicesPage() {
                             </td>
 
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
-                              {Number(item.professionalServiceCharges || 0).toFixed(2)}
+                              {formatAmount(item.professionalServiceCharges, item.currency)}
                             </td>
 
                             <td className="px-4 py-4 text-sm font-semibold text-slate-900">
-                              {Number(item.totalDue || 0).toFixed(2)}
+                              <>{formatAmount(item.totalDue, item.currency)}{item.currency === "CAD" && <p className="mt-1 text-xs font-normal text-slate-500">USD equivalent {formatAmount(item.usdEquivalent, "USD")}</p>}</>
                             </td>
 
                             <td className="px-4 py-4">

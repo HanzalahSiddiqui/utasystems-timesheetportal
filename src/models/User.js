@@ -12,6 +12,8 @@ const CompensationHistorySchema = new mongoose.Schema(
     clientPerDayRate: { type: Number, default: 0, min: 0 },
     clientPerHourRate: { type: Number, default: 0, min: 0 },
     clientOtRatePerHour: { type: Number, default: 0, min: 0 },
+    clientCurrency: { type: String, enum: ["USD", "CAD"], default: "USD" },
+    cadToUsdRate: { type: Number, default: 1, min: 0 },
   },
   { _id: false }
 );
@@ -190,6 +192,18 @@ const UserSchema = new mongoose.Schema(
     clientOtRatePerHour: {
       type: Number,
       default: 0,
+      min: 0,
+    },
+
+    clientCurrency: {
+      type: String,
+      enum: ["USD", "CAD"],
+      default: "USD",
+    },
+
+    cadToUsdRate: {
+      type: Number,
+      default: 1,
       min: 0,
     },
 

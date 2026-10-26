@@ -110,6 +110,10 @@ export async function PATCH(req, context) {
       item.totalDue = Number(item.professionalServiceCharges || 0);
     }
 
+    item.usdEquivalent = Math.round(
+      Number(item.totalDue || 0) * Number(item.exchangeRateToUSD || 1) * 100
+    ) / 100;
+
     if (notes !== undefined) {
       item.notes = String(notes || "");
     }

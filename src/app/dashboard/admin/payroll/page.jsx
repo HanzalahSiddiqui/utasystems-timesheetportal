@@ -314,7 +314,7 @@ export default function AdminPayrollPage() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
               <SummaryCard title="Employees" value={summary.totalEmployees} />
               <SummaryCard title="Gross Earnings" value={summary.totalGross.toFixed(2)} />
-              <SummaryCard title="PO Amount" value={summary.totalPo.toFixed(2)} />
+              <SummaryCard title="PO Amount (USD)" value={formatMoney(summary.totalPo)} />
               <SummaryCard title="Margin" value={summary.totalMargin.toFixed(2)} />
               <SummaryCard title="Net Payroll" value={summary.totalNet.toFixed(2)} />
               <SummaryCard title="Employer Tax (7.65%)" value={summary.totalEmployerTax.toFixed(2)} />
@@ -418,8 +418,11 @@ export default function AdminPayrollPage() {
                             {[
                               ["Pay type", item.payType], ["Daily rate used", formatMoney(item.perDayRate)], ["Hourly rate", formatMoney(item.perHourRate)],
                               ["Regular hours", item.regularHours], ["Overtime hours", item.otHours], ["Overtime pay", formatMoney(item.otPay)],
-                              ["Annual gross", formatMoney(item.annualGrossSalary)], ["Net pay", formatMoney(item.netPay)], ["PO amount", formatMoney(item.poAmount)],
-                              ["Margin", formatMoney(item.margin)], ["Employer tax", formatMoney(item.employerTax)], ["Employee expenses", formatMoney(item.employeeExpense)],
+                              ["Annual gross", formatMoney(item.annualGrossSalary)], ["Net pay", formatMoney(item.netPay)],
+                              ["PO amount (USD equivalent)", formatMoney(item.poAmount)],
+                              ["Invoice amount", `${item.clientCurrency === "CAD" ? "CAD $" : "$"}${Number(item.poAmountOriginal ?? item.poAmount ?? 0).toFixed(2)}`],
+                              ...(item.clientCurrency === "CAD" ? [["CAD to USD rate", `1 CAD = ${Number(item.exchangeRateToUSD || 0).toFixed(4)} USD`]] : []),
+                              ["Margin (USD)", formatMoney(item.margin)], ["Employer tax", formatMoney(item.employerTax)], ["Employee expenses", formatMoney(item.employeeExpense)],
                               ["Net profit", formatMoney(item.netProfit)],
                             ].map(([label, value]) => (
                               <div key={label} className="rounded-xl border border-slate-100 px-3 py-2"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-medium text-slate-800">{value ?? 0}</p></div>

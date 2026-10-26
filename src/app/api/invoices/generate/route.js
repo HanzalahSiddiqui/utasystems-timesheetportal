@@ -70,6 +70,17 @@ export async function POST(req) {
         payroll.month
       );
 
+      const currency = payroll.clientCurrency === "CAD" ? "CAD" : "USD";
+      const exchangeRateToUSD = currency === "CAD"
+        ? Number(payroll.exchangeRateToUSD || 0)
+        : 1;
+      const invoiceAmount = currency === "CAD"
+        ? Number(payroll.poAmountOriginal ?? payroll.poAmount ?? 0)
+        : Number(payroll.poAmount || 0);
+      if (currency === "CAD" && (!Number.isFinite(exchangeRateToUSD) || exchangeRateToUSD <= 0)) {
+        return Response.json({ error: `Missing valid CAD to USD rate for ${payroll.employeeName}` }, { status: 400 });
+      }
+
       const payload = {
         invoiceNumber,
         employeeId: employee._id,
@@ -84,8 +95,11 @@ export async function POST(req) {
         issueDate: new Date(),
         billingDateFrom,
         billingDateTo,
-        professionalServiceCharges: Number(payroll.poAmount || 0),
-        totalDue: Number(payroll.poAmount || 0),
+        professionalServiceCharges: invoiceAmount,
+        totalDue: invoiceAmount,
+        currency,
+        exchangeRateToUSD,
+        usdEquivalent: Math.round(invoiceAmount * exchangeRateToUSD * 100) / 100,
         status: "draft",
       };
 

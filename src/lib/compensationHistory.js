@@ -8,6 +8,8 @@ const COMPENSATION_FIELDS = [
   "clientPerDayRate",
   "clientPerHourRate",
   "clientOtRatePerHour",
+  "clientCurrency",
+  "cadToUsdRate",
 ];
 
 export function compensationSnapshot(source, effectiveFrom) {
@@ -25,6 +27,10 @@ export function compensationSnapshot(source, effectiveFrom) {
     clientPerDayRate: Number(source.clientPerDayRate || 0),
     clientPerHourRate: Number(source.clientPerHourRate || 0),
     clientOtRatePerHour: Number(source.clientOtRatePerHour || 0),
+    clientCurrency: source.clientCurrency === "CAD" ? "CAD" : "USD",
+    cadToUsdRate: source.clientCurrency === "CAD"
+      ? Number(source.cadToUsdRate || 0)
+      : 1,
   };
 }
 

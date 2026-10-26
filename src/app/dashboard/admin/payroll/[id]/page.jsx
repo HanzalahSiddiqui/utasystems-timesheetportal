@@ -297,17 +297,20 @@ export default function PayrollDetailPage() {
                         value={item.otRatePerHour ?? 0}
                       />
                       <InfoCard
-                        title="Client Daily Rate"
-                        value={item.clientPerDayRate ?? 0}
+                        title={`Client Daily Rate (${item.clientCurrency || "USD"})`}
+                        value={`${item.clientCurrency === "CAD" ? "CAD $" : "$"}${Number(item.clientPerDayRate ?? 0).toFixed(2)}`}
                       />
                       <InfoCard
-                        title="Client Hourly Rate"
-                        value={item.clientPerHourRate ?? 0}
+                        title={`Client Hourly Rate (${item.clientCurrency || "USD"})`}
+                        value={`${item.clientCurrency === "CAD" ? "CAD $" : "$"}${Number(item.clientPerHourRate ?? 0).toFixed(2)}`}
                       />
                       <InfoCard
-                        title="Client OT Rate"
-                        value={item.clientOtRatePerHour ?? 0}
+                        title={`Client OT Rate (${item.clientCurrency || "USD"})`}
+                        value={`${item.clientCurrency === "CAD" ? "CAD $" : "$"}${Number(item.clientOtRatePerHour ?? 0).toFixed(2)}`}
                       />
+                      {item.clientCurrency === "CAD" && (
+                        <InfoCard title="CAD to USD Exchange Rate" value={`1 CAD = ${Number(item.exchangeRateToUSD || 0).toFixed(4)} USD`} />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -323,11 +326,12 @@ export default function PayrollDetailPage() {
                       <InfoCard title="OT Pay" value={item.otPay} />
                       <InfoCard title="Gross Salary" value={item.grossPay} />
                       <InfoCard
-                        title="PO Regular Amount"
+                        title="PO Regular Amount (USD)"
                         value={item.poRegularAmount}
                       />
-                      <InfoCard title="PO OT Amount" value={item.poOtAmount} />
-                      <InfoCard title="PO Amount" value={item.poAmount} />
+                      <InfoCard title="PO OT Amount (USD)" value={item.poOtAmount} />
+                      <InfoCard title="PO Amount (USD)" value={item.poAmount} />
+                      <InfoCard title={`Invoice Amount (${item.clientCurrency || "USD"})`} value={`${item.clientCurrency === "CAD" ? "CAD $" : "$"}${Number(item.poAmountOriginal ?? item.poAmount ?? 0).toFixed(2)}`} />
                       <InfoCard title="Allowances" value={item.allowances} />
                       <InfoCard title="Per Diem / Other Income" value={item.perDiemOtherIncome ?? 0} />
                       <InfoCard title="Deductions" value={item.deductions} />

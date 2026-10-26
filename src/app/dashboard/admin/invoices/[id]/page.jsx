@@ -6,6 +6,11 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import { formatInvoiceDate } from "@/lib/invoiceFormatters";
 
+function formatAmount(value, currency = "USD") {
+  const amount = Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return currency === "CAD" ? `CAD $${amount}` : `$${amount}`;
+}
+
 export default function InvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -374,7 +379,7 @@ export default function InvoiceDetailPage() {
                                     Professional Service Charges:
                                   </td>
                                   <td className="px-4 py-4 text-center">
-                                    ${Number(form.professionalServiceCharges || 0).toFixed(2)}
+                                    {formatAmount(form.professionalServiceCharges, item.currency)}
                                   </td>
                                 </tr>
 
@@ -383,12 +388,13 @@ export default function InvoiceDetailPage() {
                                     TOTAL DUE:
                                   </td>
                                   <td className="px-4 py-4 text-center font-bold">
-                                    ${Number(form.totalDue || 0).toFixed(2)}
+                                    {formatAmount(form.totalDue, item.currency)}
                                   </td>
                                 </tr>
                               </tbody>
                             </table>
                           </div>
+                          {item.currency === "CAD" && <p className="mt-3 text-right text-xs text-slate-500">Exchange rate: 1 CAD = {Number(item.exchangeRateToUSD || 0).toFixed(4)} USD · USD equivalent: {formatAmount(Number(form.totalDue || 0) * Number(item.exchangeRateToUSD || 0), "USD")}</p>}
                         </div>
 
                         <div className="mt-16 h-[10px] bg-[#2a4f84]" />

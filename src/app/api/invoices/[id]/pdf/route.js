@@ -57,6 +57,9 @@ export async function GET(request, context) {
         invoice.professionalServiceCharges ??
         invoice.poAmount ??
         0,
+      currency: invoice.currency === "CAD" ? "CAD" : "USD",
+      exchangeRateToUSD: Number(invoice.exchangeRateToUSD || 1),
+      usdEquivalent: Number(invoice.usdEquivalent ?? (invoice.totalDue || 0) * (invoice.exchangeRateToUSD || 1)),
       logoLeftUrl: `${origin}/logo-left.jpeg`,
       logoRightUrl: `${origin}/logo-right.png`,
     };

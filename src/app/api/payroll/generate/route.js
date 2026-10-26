@@ -96,6 +96,7 @@ function getCalendarSummary(month, holidays, user) {
 
 function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDates, existing = null) {
   const summary = summarizeEntries(timesheet.entries || [], holidayDates);
+  const existingPerDiem = Number(existing?.perDiemOtherIncome || 0);
   const compensation = compensationForMonth(user, month, existing);
   const payType = compensation.payType || "daily";
 
@@ -119,20 +120,24 @@ function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDate
   let payableDays = 0;
 
   let regularPay = 0;
-  let poRegularAmount = 0;
+  let poRegularAmountOriginal = 0;
 
   if (payType === "daily") {
     payableDays = summary.presentDays;
 
     regularPay = payableDays * perDayRate;
-    poRegularAmount = payableDays * clientPerDayRate;
+    poRegularAmountOriginal = payableDays * clientPerDayRate;
   } else if (payType === "hourly") {
     regularPay = summary.regularHours * perHourRate;
-    poRegularAmount = summary.regularHours * clientPerHourRate;
+    poRegularAmountOriginal = summary.regularHours * clientPerHourRate;
   }
 
   const otPay = summary.otHours * otRatePerHour;
-  const poOtAmount = summary.otHours * clientOtRatePerHour;
+  const poOtAmountOriginal = summary.otHours * clientOtRatePerHour;
+  const clientCurrency = compensation.clientCurrency === "CAD" ? "CAD" : "USD";
+  const exchangeRateToUSD = clientCurrency === "CAD" ? Number(compensation.cadToUsdRate || 0) : 1;
+  const poRegularAmount = round2(poRegularAmountOriginal * exchangeRateToUSD);
+  const poOtAmount = round2(poOtAmountOriginal * exchangeRateToUSD);
 
   const allowances = 0;
   const deductions = 0;
@@ -167,6 +172,8 @@ function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDate
     clientPerDayRate,
     clientPerHourRate,
     clientOtRatePerHour,
+    clientCurrency,
+    exchangeRateToUSD,
 
     totalWeekdays: calendar.totalWeekdays,
     workingDays: calendar.workingDays,
@@ -192,6 +199,9 @@ function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDate
     poRegularAmount: round2(poRegularAmount),
     poOtAmount: round2(poOtAmount),
     poAmount: round2(poAmount),
+    poRegularAmountOriginal: round2(poRegularAmountOriginal),
+    poOtAmountOriginal: round2(poOtAmountOriginal),
+    poAmountOriginal: round2(poRegularAmountOriginal + poOtAmountOriginal),
 
     employerTax: round2(employerTax),
 margin: round2(margin),

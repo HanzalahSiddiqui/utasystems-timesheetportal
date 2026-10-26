@@ -49,6 +49,8 @@ export async function PATCH(req, context) {
       clientPerDayRate,
       clientPerHourRate,
       clientOtRatePerHour,
+      clientCurrency,
+      cadToUsdRate,
       payrollEnabled,
       joiningDate,
       leavingDate,
@@ -131,6 +133,16 @@ export async function PATCH(req, context) {
     if (payType !== undefined && !["daily", "hourly"].includes(payType)) {
       return Response.json({ error: "Invalid pay type" }, { status: 400 });
     }
+    if (clientCurrency !== undefined && !["USD", "CAD"].includes(clientCurrency)) {
+      return Response.json({ error: "Client currency must be USD or CAD" }, { status: 400 });
+    }
+    const nextClientCurrency = clientCurrency ?? employee.clientCurrency ?? "USD";
+    const nextCadToUsdRate = nextClientCurrency === "CAD"
+      ? Number(cadToUsdRate !== undefined ? cadToUsdRate : (employee.cadToUsdRate || 0))
+      : 1;
+    if (!Number.isFinite(nextCadToUsdRate) || nextCadToUsdRate <= 0) {
+      return Response.json({ error: "Enter a valid CAD to USD exchange rate greater than 0" }, { status: 400 });
+    }
 
     const nextPayType = payType ?? employee.payType;
     const nextAnnualSalary = annualGrossSalary === undefined
@@ -205,6 +217,8 @@ export async function PATCH(req, context) {
       clientPerDayRate: clientPerDayRate !== undefined ? Number(clientPerDayRate) : Number(employee.clientPerDayRate || 0),
       clientPerHourRate: clientPerHourRate !== undefined ? Number(clientPerHourRate) : Number(employee.clientPerHourRate || 0),
       clientOtRatePerHour: clientOtRatePerHour !== undefined ? Number(clientOtRatePerHour) : Number(employee.clientOtRatePerHour || 0),
+      clientCurrency: nextClientCurrency,
+      cadToUsdRate: nextCadToUsdRate,
     }, rateEffectiveFrom || "0001-01-01");
     const compensationChanged = hasCompensationChanged(
       compensationSnapshot(employee, "0001-01-01"),
@@ -300,6 +314,8 @@ export async function PATCH(req, context) {
     employee.clientPerDayRate = compensationToApply.clientPerDayRate;
     employee.clientPerHourRate = compensationToApply.clientPerHourRate;
     employee.clientOtRatePerHour = compensationToApply.clientOtRatePerHour;
+    employee.clientCurrency = compensationToApply.clientCurrency;
+    employee.cadToUsdRate = compensationToApply.cadToUsdRate;
 
     if (payrollEnabled !== undefined) {
       employee.payrollEnabled = !!payrollEnabled;

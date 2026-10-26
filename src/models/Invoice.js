@@ -93,6 +93,10 @@ const InvoiceSchema = new mongoose.Schema(
       min: 0,
     },
 
+    currency: { type: String, enum: ["USD", "CAD"], default: "USD" },
+    exchangeRateToUSD: { type: Number, default: 1, min: 0 },
+    usdEquivalent: { type: Number, default: 0, min: 0 },
+
     status: {
       type: String,
       enum: ["draft", "finalized", "sent", "paid"],
