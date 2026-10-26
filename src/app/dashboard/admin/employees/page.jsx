@@ -761,6 +761,7 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [clients, setClients] = useState([]);
   const [activeSection, setActiveSection] = useState("directory");
+  const [employeeFilter, setEmployeeFilter] = useState("all");
 
   const [form, setForm] = useState({
     name: "",
@@ -982,9 +983,10 @@ payrollEnabled: true,
 
   const filteredEmployees = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return employees;
 
     return employees.filter((emp) => {
+      if (employeeFilter === "payroll" && emp.payrollEnabled === false) return false;
+      if (!q) return true;
       const name = emp.name?.toLowerCase() || "";
       const email = emp.email?.toLowerCase() || "";
       const employeeId = emp.employeeId?.toLowerCase() || "";
@@ -1011,7 +1013,7 @@ payrollEnabled: true,
         clientPerHourRate.includes(q)
       );
     });
-  }, [employees, search]);
+  }, [employees, search, employeeFilter]);
 
 useEffect(() => {
   const annual = Number(form.annualGrossSalary || 0);
@@ -1024,6 +1026,7 @@ useEffect(() => {
 }, [form.annualGrossSalary]);
   const activeEmployees = employees.filter((e) => e.status === "active").length;
   const inactiveEmployees = employees.filter((e) => e.status === "inactive").length;
+  const payrollActiveEmployees = employees.filter((e) => e.payrollEnabled !== false).length;
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -1086,13 +1089,32 @@ useEffect(() => {
         </p>
       </div>
 
-      <div className="w-full xl:w-[340px]">
-        <Input
-          type="text"
-          placeholder="Search by name, email, ID, department..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center xl:w-auto">
+        <div className="flex w-full gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit" role="tablist" aria-label="Employee directory filters">
+          {[
+            { id: "all", label: "All Employees", count: employees.length },
+            { id: "payroll", label: "Payroll Active", count: payrollActiveEmployees },
+          ].map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              role="tab"
+              aria-selected={employeeFilter === filter.id}
+              onClick={() => setEmployeeFilter(filter.id)}
+              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:flex-none ${employeeFilter === filter.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              {filter.label}<span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${employeeFilter === filter.id ? "bg-slate-100 text-slate-700" : "bg-white/70 text-slate-500"}`}>{filter.count}</span>
+            </button>
+          ))}
+        </div>
+        <div className="w-full sm:min-w-[280px] xl:w-[340px]">
+          <Input
+            type="text"
+            placeholder="Search by name, email, ID, department..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
     </div>
 
