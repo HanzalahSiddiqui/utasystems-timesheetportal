@@ -51,14 +51,14 @@ export async function PATCH(req, context) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = context.params;
+    const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return Response.json({ error: "Invalid payroll ID" }, { status: 400 });
     }
 
     const body = await req.json();
-    const { allowances, deductions, remarks, status } = body;
+    const { allowances, deductions, perDiemOtherIncome, remarks, status } = body;
 
     await connectDB();
 
@@ -86,6 +86,14 @@ export async function PATCH(req, context) {
       }
 
       item.allowances = round2(Number(allowances));
+    }
+
+    if (perDiemOtherIncome !== undefined) {
+      const amount = Number(perDiemOtherIncome);
+      if (!Number.isFinite(amount) || amount < 0) {
+        return Response.json({ error: "Per diem / other income must be a non-negative amount" }, { status: 400 });
+      }
+      item.perDiemOtherIncome = round2(amount);
     }
 
     /* ---------- Deductions ---------- */

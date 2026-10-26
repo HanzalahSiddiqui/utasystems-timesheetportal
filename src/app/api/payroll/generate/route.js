@@ -5,12 +5,13 @@ import MonthlyTimesheet from "@/models/MonthlyTimesheet";
 import { calculatePayrollFinancials } from "@/lib/payrollCalc";
 import Payroll from "@/models/Payroll";
 import Expense from "@/models/Expense";
+import Holiday from "@/models/Holiday";
 
 function round2(num) {
   return Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 }
 
-function summarizeEntries(entries = []) {
+function summarizeEntries(entries = [], holidayDates = new Set()) {
   let presentDays = 0;
   let paidLeaveDays = 0;
   let unpaidLeaveDays = 0;
@@ -18,6 +19,8 @@ function summarizeEntries(entries = []) {
   let otHours = 0;
 
   for (const entry of entries) {
+    if (entry.isHoliday || holidayDates.has(entry.date)) continue;
+
     const regular = Number(entry.regularHours || 0);
     const ot = Number(entry.otHours || 0);
     const leave = entry.leaveType || "";
@@ -47,12 +50,64 @@ function summarizeEntries(entries = []) {
   };
 }
 
-function buildPayrollFromTimesheet(user, timesheet, month) {
-  const summary = summarizeEntries(timesheet.entries || []);
+function getCalendarSummary(month, holidays, user) {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new Error("Month must use YYYY-MM format");
+  }
+
+  const [year, monthNumber] = month.split("-").map(Number);
+  const finalDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const holidayDates = new Set(holidays.map((holiday) => holiday.date));
+  const joiningDate = user.joiningDate
+    ? new Date(user.joiningDate).toISOString().slice(0, 10)
+    : "";
+  const leavingDate = user.leavingDate
+    ? new Date(user.leavingDate).toISOString().slice(0, 10)
+    : "";
+
+  let totalWeekdays = 0;
+  let workingDays = 0;
+  let holidayWeekdays = 0;
+  let monthWorkingDays = 0;
+
+  for (let day = 1; day <= finalDay; day += 1) {
+    const date = month + "-" + String(day).padStart(2, "0");
+    const weekday = new Date(date + "T00:00:00.000Z").getUTCDay();
+    if (weekday !== 0 && weekday !== 6 && !holidayDates.has(date)) {
+      monthWorkingDays += 1;
+    }
+
+    if (joiningDate && date < joiningDate) continue;
+    if (leavingDate && date > leavingDate) continue;
+
+    if (weekday === 0 || weekday === 6) continue;
+
+    totalWeekdays += 1;
+    if (holidayDates.has(date)) {
+      holidayWeekdays += 1;
+    } else {
+      workingDays += 1;
+    }
+  }
+
+  return { totalWeekdays, workingDays, holidayWeekdays, monthWorkingDays };
+}
+
+function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDates, existingPerDiem = 0) {
+  const summary = summarizeEntries(timesheet.entries || [], holidayDates);
 
   const payType = user.payType || "daily";
 
-  const perDayRate = Number(user.perDayRate || 0);
+  const monthlyGrossSalary = Number(user.monthlyGrossSalary || 0);
+  const annualGrossSalary = Number(user.annualGrossSalary || 0);
+  const monthlySalaryBase = monthlyGrossSalary > 0
+    ? monthlyGrossSalary
+    : annualGrossSalary > 0
+      ? annualGrossSalary / 12
+      : 0;
+  const perDayRate = payType === "daily" && monthlySalaryBase > 0 && calendar.monthWorkingDays > 0
+    ? monthlySalaryBase / calendar.monthWorkingDays
+    : Number(user.perDayRate || 0);
   const perHourRate = Number(user.perHourRate || 0);
   const otRatePerHour = Number(user.otRatePerHour || 0);
 
@@ -99,6 +154,8 @@ function buildPayrollFromTimesheet(user, timesheet, month) {
     department: user.department || "",
     month,
     timesheetId: timesheet._id,
+    annualGrossSalary: round2(annualGrossSalary),
+    monthlyGrossSalary: round2(monthlySalaryBase),
 
     payType,
 
@@ -109,6 +166,11 @@ function buildPayrollFromTimesheet(user, timesheet, month) {
     clientPerDayRate,
     clientPerHourRate,
     clientOtRatePerHour,
+
+    totalWeekdays: calendar.totalWeekdays,
+    workingDays: calendar.workingDays,
+    holidayWeekdays: calendar.holidayWeekdays,
+    numberOfDependents: Number(user.numberOfDependents || 0),
 
     presentDays: summary.presentDays,
     paidLeaveDays: summary.paidLeaveDays,
@@ -121,6 +183,7 @@ function buildPayrollFromTimesheet(user, timesheet, month) {
     regularPay: round2(regularPay),
     otPay: round2(otPay),
     grossPay: round2(grossPay),
+    perDiemOtherIncome: round2(existingPerDiem),
     deductions: round2(deductions),
     allowances: round2(allowances),
     netPay: round2(netPay),
@@ -149,8 +212,8 @@ export async function POST(req) {
     const body = await req.json();
     const { month } = body;
 
-    if (!month) {
-      return Response.json({ error: "Month is required" }, { status: 400 });
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || "")) {
+      return Response.json({ error: "Month must use YYYY-MM format" }, { status: 400 });
     }
 
     await connectDB();
@@ -168,6 +231,7 @@ export async function POST(req) {
       });
     }
 
+    const holidays = await Holiday.find({ month }).select("date");
     const results = [];
 
     for (const timesheet of approvedTimesheets) {
@@ -178,7 +242,16 @@ export async function POST(req) {
       if (user.status !== "active") continue;
       if (user.payrollEnabled === false) continue;
 
-      const payload = buildPayrollFromTimesheet(user, timesheet, month);
+      const calendar = getCalendarSummary(month, holidays, user);
+      const existing = await Payroll.findOne({ employeeId: user._id, month });
+      const payload = buildPayrollFromTimesheet(
+        user,
+        timesheet,
+        month,
+        calendar,
+        new Set(holidays.map((holiday) => holiday.date)),
+        existing?.perDiemOtherIncome || 0
+      );
       // ---------- EXPENSE CALCULATION ----------
 
 const start = new Date(`${month}-01`);
@@ -205,11 +278,6 @@ const realProfit = Number(payload.margin || 0) - employeeExpense;
 
 payload.employeeExpense = Math.round(employeeExpense * 100) / 100;
 payload.realProfit = Math.round(realProfit * 100) / 100;
-
-      const existing = await Payroll.findOne({
-        employeeId: user._id,
-        month,
-      });
 
       if (existing && existing.status === "finalized") {
         results.push(existing);

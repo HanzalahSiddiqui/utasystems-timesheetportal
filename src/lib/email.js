@@ -447,3 +447,67 @@ UTA Timesheet Portal
     text,
   });
 }
+function escapeEmailHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  })[character]);
+}
+
+export function getTimesheetEmailRecipient(recipient) {
+  return (
+    process.env.TIMESHEET_EMAIL_TEST_RECIPIENT ||
+    (process.env.NODE_ENV !== "production"
+      ? "hanzalah@utasystems.com"
+      : recipient)
+  );
+}
+
+export async function sendTimesheetReminderEmail({ employee, months, testMode = false }) {
+  const safeName = escapeEmailHtml(employee.name || "Employee");
+  const monthList = months.map((month) => `<li>${escapeEmailHtml(month)}</li>`).join("");
+  const textMonths = months.map((month) => `- ${month}`).join("\n");
+  const recipient = getTimesheetEmailRecipient(employee.email);
+  const isTest = testMode || recipient !== employee.email;
+  const testNoticeHtml = isTest ? "<p><strong>Test delivery.</strong></p>" : "";
+  const testNoticeText = isTest ? "TEST DELIVERY\n\n" : "";
+  return sendEmail({
+    to: recipient,
+    subject: `${isTest ? "[TEST] " : ""}Reminder: Submit your monthly timesheet`,
+    html: `${testNoticeHtml}<p>Hello ${safeName},</p><p>Please submit your timesheet for the following month(s):</p><ul>${monthList}</ul><p>This reminder will continue daily until submission.</p><p>UTA Systems Timesheet Portal</p>`,
+    text: `${testNoticeText}Hello ${employee.name || "Employee"},\n\nPlease submit your timesheet for the following month(s):\n${textMonths}\n\nThis reminder will continue daily until submission.\n\nUTA Systems Timesheet Portal`,
+  });
+}
+
+export async function sendTimesheetSubmittedEmail({ employee, month, totalHours }) {
+  const hrRecipient = process.env.TIMESHEET_HR_EMAIL || "hr@utasystems.com";
+  const recipient = getTimesheetEmailRecipient(hrRecipient);
+  const isTest = recipient !== hrRecipient;
+  const safeName = escapeEmailHtml(employee.name || "Employee");
+  const safeEmployeeCode = escapeEmailHtml(employee.employeeId || "-");
+  const hours = Number(totalHours || 0).toFixed(2);
+  return sendEmail({
+    to: recipient,
+    subject: `${isTest ? "[TEST] " : ""}Timesheet submitted: ${employee.name || "Employee"} - ${month}`,
+    html: `${isTest ? "<p><strong>Test delivery.</strong></p>" : ""}<p>A timesheet was submitted.</p><p><strong>Employee:</strong> ${safeName} (${safeEmployeeCode})<br/><strong>Month:</strong> ${escapeEmailHtml(month)}<br/><strong>Total hours:</strong> ${hours}</p><p>UTA Systems Timesheet Portal</p>`,
+    text: `${isTest ? "TEST DELIVERY\n\n" : ""}Timesheet submitted\nEmployee: ${employee.name || "Employee"} (${employee.employeeId || "-"})\nMonth: ${month}\nTotal hours: ${hours}\n\nUTA Systems Timesheet Portal`,
+  });
+}
+
+export async function sendTimesheetReviewEmail({ employee, month, action, reviewComment }) {
+  if (!employee.email) throw new Error("Employee email is not configured");
+  const recipient = getTimesheetEmailRecipient(employee.email);
+  const isTest = recipient !== employee.email;
+  const title = action === "approved" ? "approved" : "needs changes";
+  const safeName = escapeEmailHtml(employee.name || "Employee");
+  const safeComment = escapeEmailHtml(reviewComment || "No review comment was provided.");
+  return sendEmail({
+    to: recipient,
+    subject: `${isTest ? "[TEST] " : ""}Timesheet ${title}: ${month}`,
+    html: `${isTest ? "<p><strong>Test delivery.</strong></p>" : ""}<p>Hello ${safeName},</p><p>Your timesheet for <strong>${escapeEmailHtml(month)}</strong> was ${title}.</p>${action === "rejected" ? `<p><strong>Review comment:</strong> ${safeComment}</p>` : ""}<p>UTA Systems Timesheet Portal</p>`,
+    text: `${isTest ? "TEST DELIVERY\n\n" : ""}Hello ${employee.name || "Employee"},\n\nYour timesheet for ${month} was ${title}.${action === "rejected" ? `\nReview comment: ${reviewComment || "No review comment was provided."}` : ""}\n\nUTA Systems Timesheet Portal`,
+  });
+}

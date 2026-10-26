@@ -31,6 +31,8 @@ const PayrollSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    annualGrossSalary: { type: Number, default: 0, min: 0 },
+    monthlyGrossSalary: { type: Number, default: 0, min: 0 },
     timesheetId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "MonthlyTimesheet",
@@ -72,6 +74,27 @@ const PayrollSchema = new mongoose.Schema(
       min: 0,
     },
     clientOtRatePerHour: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    totalWeekdays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    workingDays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    holidayWeekdays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    numberOfDependents: {
       type: Number,
       default: 0,
       min: 0,
@@ -131,6 +154,12 @@ const PayrollSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    perDiemOtherIncome: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     allowances: {
       type: Number,
       default: 0,

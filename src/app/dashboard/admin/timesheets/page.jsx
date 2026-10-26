@@ -8,8 +8,9 @@ import MonthlySubmissionManager from "@/components/MonthlySubmissionManager";
 export default function AdminTimesheetsPage() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
   const today = new Date();
-  const defaultMonth = `${today.getFullYear()}-${String(
-    today.getMonth() + 1
+  const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const defaultMonth = `${previousMonth.getFullYear()}-${String(
+    previousMonth.getMonth() + 1
   ).padStart(2, "0")}`;
 
   const [exportMonth, setExportMonth] = useState(defaultMonth);

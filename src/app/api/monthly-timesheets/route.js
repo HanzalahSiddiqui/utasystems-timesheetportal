@@ -3,10 +3,13 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import MonthlyTimesheet from "@/models/MonthlyTimesheet";
 import Holiday from "@/models/Holiday";
+import User from "@/models/User";
+import { sendTimesheetSubmittedEmail } from "@/lib/email";
+import TimesheetSubmissionNotification from "@/models/TimesheetSubmissionNotification";
+import { getBusinessMonth } from "@/lib/datePolicy";
 
 function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return getBusinessMonth();
 }
 
 export async function GET(req) {
@@ -79,6 +82,9 @@ export async function POST(req) {
       employeeId: session.user.id,
       month,
     });
+    const shouldNotifyHR =
+      !!submit &&
+      !["submitted", "approved", "rejected"].includes(existing?.status);
 
     if (existing && existing.locked && !existing.adminOverride) {
       return Response.json(
@@ -145,11 +151,61 @@ export async function POST(req) {
       doc = await MonthlyTimesheet.create(payload);
     }
 
+    let hrNotificationSent = false;
+    if (shouldNotifyHR) {
+      try {
+        const employee = await User.findById(session.user.id).select("name email employeeId");
+        if (employee) {
+          const totalHours = sanitizedEntries.reduce(
+            (sum, entry) => sum + Number(entry.regularHours || 0) + Number(entry.otHours || 0),
+            0
+          );
+          const submissionKey = `${doc._id}-${new Date(doc.submittedAt).getTime()}`;
+          const notification = await TimesheetSubmissionNotification.findOneAndUpdate(
+            { submissionKey },
+            {
+              $setOnInsert: {
+                submissionKey,
+                timesheetId: doc._id,
+                employeeName: employee.name,
+                employeeEmail: employee.email,
+                employeeCode: employee.employeeId,
+                month,
+                totalHours,
+                status: "pending",
+              },
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+          if (notification.status !== "sent") {
+            try {
+              await sendTimesheetSubmittedEmail({ employee, month, totalHours });
+              notification.status = "sent";
+              notification.sentAt = new Date();
+              notification.lastError = "";
+              await notification.save();
+              hrNotificationSent = true;
+            } catch (emailError) {
+              notification.attempts += 1;
+              notification.lastError = String(emailError.message || "Email delivery failed").slice(0, 500);
+              await notification.save();
+              console.error("HR timesheet submission notification failed:", emailError);
+            }
+          } else {
+            hrNotificationSent = true;
+          }
+        }
+      } catch (notificationError) {
+        console.error("HR timesheet notification could not be queued:", notificationError);
+      }
+    }
+
     return Response.json({
       message: submit
         ? "Timesheet submitted successfully"
         : "Draft saved successfully",
       item: doc,
+      ...(shouldNotifyHR ? { hrNotificationSent } : {}),
     });
   } catch (error) {
     console.error("POST /api/monthly-timesheets error:", error);

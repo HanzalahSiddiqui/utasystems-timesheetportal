@@ -11,8 +11,9 @@ export default function GetTimesheetPage() {
   const { data: session } = useSession();
 
   const today = new Date();
-  const defaultMonth = `${today.getFullYear()}-${String(
-    today.getMonth() + 1
+  const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const defaultMonth = `${previousMonth.getFullYear()}-${String(
+    previousMonth.getMonth() + 1
   ).padStart(2, "0")}`;
 
   const [month, setMonth] = useState(defaultMonth);

@@ -103,13 +103,21 @@ function SectionCard({ title, subtitle, children }) {
   );
 }
 
+function dateForInput(value) {
+  return value ? new Date(value).toISOString().slice(0, 10) : "";
+}
+
+function dateForDisplay(value) {
+  return value ? new Date(value).toLocaleDateString("en-US", { timeZone: "UTC" }) : "-";
+}
+
 function InfoPair({ label, value }) {
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-sm text-slate-800">{value || "-"}</p>
+      <p className="mt-1 break-words whitespace-pre-line text-sm text-slate-800">{value || "-"}</p>
     </div>
   );
 }
@@ -118,12 +126,19 @@ function EditEmployeeModal({ employee, clients=[], onClose, onSaved }) {
 const [form, setForm] = useState({
   name: employee.name || "",
   email: employee.email || "",
+  personalEmail: employee.personalEmail || "",
+  address: employee.address || "",
+  ssn: "",
   designation: employee.designation || "",
   department: employee.department || "",
   status: employee.status || "active",
+  joiningDate: dateForInput(employee.joiningDate),
+  leavingDate: dateForInput(employee.leavingDate),
+  revocationReason: employee.revocationReason || "",
   password: "",
   clientId: employee.clientId?._id || employee.clientId || "",
   payType: employee.payType || "daily",
+  numberOfDependents: employee.numberOfDependents ?? 0,
   perDayRate: employee.perDayRate ?? "",
   perHourRate: employee.perHourRate ?? "",
   otRatePerHour: employee.otRatePerHour ?? "",
@@ -155,14 +170,12 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
     try {
       const payload = {
         ...form,
+        numberOfDependents: Number(form.numberOfDependents || 0),
         perDayRate:
-          form.payType === "daily" && form.perDayRate !== ""
-            ? Number(form.perDayRate)
+          form.payType === "daily" && Number(form.annualGrossSalary || 0) <= 0
+            ? Number(form.perDayRate || 0)
             : 0,
-        perHourRate:
-          form.payType === "hourly" && form.perHourRate !== ""
-            ? Number(form.perHourRate)
-            : 0,
+        perHourRate: Number(form.perHourRate || 0),
         otRatePerHour:
           form.otRatePerHour !== "" ? Number(form.otRatePerHour) : 0,
         clientPerDayRate:
@@ -249,6 +262,10 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
             />
           </Field>
 
+          <Field label="Personal Email (Reminders)">
+            <Input type="email" value={form.personalEmail} onChange={(e) => setForm({ ...form, personalEmail: e.target.value })} />
+          </Field>
+
           <Field label="Designation">
             <Input
               value={form.designation}
@@ -260,6 +277,30 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
             <Input
               value={form.department}
               onChange={(e) => setForm({ ...form, department: e.target.value })}
+            />
+          </Field>
+
+          <div className="md:col-span-2">
+            <SectionCard title="Personal and identity details" subtitle="Address is private. SSN is encrypted before saving and only its last four digits are displayed.">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Home Address">
+                  <textarea rows={3} maxLength={500} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100" placeholder="Street, city, state, ZIP" />
+                </Field>
+                <Field label="Social Security Number (SSN)">
+                  <Input type="password" inputMode="numeric" autoComplete="off" maxLength={11} value={form.ssn} onChange={(e) => setForm({ ...form, ssn: e.target.value })} placeholder="Enter 9 digits to add or replace" />
+                  <p className="mt-1 text-xs text-slate-500">{employee.ssnLast4 ? `SSN on file: ***-**-${employee.ssnLast4}. ` : "No SSN on file. "}Leave blank to keep the current SSN.</p>
+                </Field>
+              </div>
+            </SectionCard>
+          </div>
+
+          <Field label="Number of Dependents">
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={form.numberOfDependents}
+              onChange={(e) => setForm({ ...form, numberOfDependents: e.target.value })}
             />
           </Field>
           <Field label="Client">
@@ -278,6 +319,14 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
   </Select>
 </Field>
 
+          <Field label="Joining Date">
+            <Input type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} />
+          </Field>
+
+          <Field label="Leaving / Valid-to Date">
+            <Input type="date" value={form.leavingDate} onChange={(e) => setForm({ ...form, leavingDate: e.target.value })} />
+          </Field>
+
           <Field label="Status">
             <Select
               value={form.status}
@@ -287,6 +336,19 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
               <option value="inactive">inactive</option>
             </Select>
           </Field>
+
+          {form.status === "inactive" && (
+            <Field label="Revocation Reason">
+              <Input value={form.revocationReason} onChange={(e) => setForm({ ...form, revocationReason: e.target.value })} placeholder="Reason for revoking access" />
+            </Field>
+          )}
+
+          {employee.revokedAt && (
+            <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <strong>Last access revocation:</strong> {new Date(employee.revokedAt).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+              {employee.revocationReason ? ` — ${employee.revocationReason}` : ""}
+            </div>
+          )}
 
           <Field label="Reset Password">
             <Input
@@ -307,19 +369,7 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                   <Select
                     value={form.payType}
                     onChange={(e) =>
-                      setForm({
-                        ...form,
-                        payType: e.target.value,
-                        perDayRate: e.target.value === "daily" ? form.perDayRate : "",
-                        perHourRate:
-                          e.target.value === "hourly" ? form.perHourRate : "",
-                        clientPerDayRate:
-                          e.target.value === "daily" ? form.clientPerDayRate : "",
-                        clientPerHourRate:
-                          e.target.value === "hourly"
-                            ? form.clientPerHourRate
-                            : "",
-                      })
+                      setForm({ ...form, payType: e.target.value })
                     }
                   >
                     <option value="daily">daily</option>
@@ -327,20 +377,19 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                   </Select>
                 </Field>
 
-                {form.payType === "daily" ? (
+                {form.payType === "daily" && Number(form.annualGrossSalary || 0) > 0 && (
                   <Field label="Employee Per Day Rate">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.perDayRate}
-                      onChange={(e) =>
-                        setForm({ ...form, perDayRate: e.target.value })
-                      }
-                    />
+                    <Input value="Auto-calculated per payroll month" disabled />
+                    <p className="mt-1 text-xs text-slate-500">Monthly gross is divided by that month’s working days. Weekday holidays are excluded.</p>
                   </Field>
-                ) : (
-                  <Field label="Employee Per Hour Rate">
+                )}
+                {form.payType === "daily" && Number(form.annualGrossSalary || 0) <= 0 && (
+                  <Field label="Manual Employee Per Day Rate">
+                    <Input type="number" min="0" step="0.01" value={form.perDayRate} onChange={(e) => setForm({ ...form, perDayRate: e.target.value })} required />
+                    <p className="mt-1 text-xs text-slate-500">Used only when annual gross salary is blank or zero.</p>
+                  </Field>
+                )}
+                {form.payType === "hourly" && <Field label="Employee Per Hour Rate">
                     <Input
                       type="number"
                       min="0"
@@ -350,8 +399,7 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                         setForm({ ...form, perHourRate: e.target.value })
                       }
                     />
-                  </Field>
-                )}
+                  </Field>}
 
 <Field label="Annual Gross Salary">
   <Input
@@ -479,79 +527,80 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
 }
 
 function EmployeeMobileCard({ emp, onEdit, onToggleStatus, onDelete }) {
+  const annualGross = Number(emp.annualGrossSalary || 0);
+  const monthlyGross = Number(emp.monthlyGrossSalary || 0) || annualGross / 12;
+  const employeeRate = emp.payType === "hourly"
+    ? `Hourly: $${Number(emp.perHourRate || 0).toLocaleString()}/hr`
+    : annualGross > 0
+      ? `Salary: $${monthlyGross.toLocaleString()}/month; daily rate varies by month`
+      : `Manual daily: $${Number(emp.perDayRate || 0).toLocaleString()}/day`;
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-slate-900">
+          <h3 className="truncate text-base font-semibold text-slate-900">
             {emp.name}
-          </p>
-          <p className="mt-1 break-all text-sm text-slate-500">{emp.email}</p>
+          </h3>
+          <p className="mt-1 break-all text-sm text-slate-600">{emp.email}</p>
+          <p className="mt-1 text-xs text-slate-500">ID {emp.employeeId || "-"}{emp.designation ? ` · ${emp.designation}` : ""}</p>
         </div>
-        <PayTypeBadge payType={emp.payType} />
+        <div className="flex flex-wrap gap-2">
+          <PayTypeBadge payType={emp.payType} />
+          <PayrollBadge enabled={emp.payrollEnabled !== false} />
+          <StatusBadge status={emp.status || "active"} />
+        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <InfoPair label="Employee ID" value={emp.employeeId} />
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <InfoPair label="Department" value={emp.department || "-"} />
-        <InfoPair label="Designation" value={emp.designation || "-"} />
-        <InfoPair
-          label="Employee Rate"
-          value={
-            emp.payType === "hourly"
-              ? `Hourly: ${emp.perHourRate ?? 0}`
-              : `Daily: ${emp.perDayRate ?? 0}`
-          }
-        />
-        <InfoPair label="Emp. OT" value={emp.otRatePerHour ?? 0} />
-        <InfoPair
-          label="PO Rate"
-          value={
-            emp.payType === "hourly"
-              ? `Hourly: ${emp.clientPerHourRate ?? 0}`
-              : `Daily: ${emp.clientPerDayRate ?? 0}`
-          }
-        />
-        <InfoPair label="PO OT" value={emp.clientOtRatePerHour ?? 0} />
-        <InfoPair
-  label="Annual Gross"
-  value={Number(emp.annualGrossSalary || 0).toLocaleString()}
-/>
-
-<InfoPair
-  label="Monthly Gross"
-  value={Number(emp.monthlyGrossSalary || 0).toLocaleString()}
-/>
+        <InfoPair label="Client" value={emp.clientId?.clientName || "-"} />
+        <InfoPair label="Payroll basis" value={employeeRate} />
+        <InfoPair label="Dependents" value={emp.numberOfDependents ?? 0} />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <PayrollBadge enabled={emp.payrollEnabled !== false} />
-        <StatusBadge status={emp.status || "active"} />
-      </div>
+      <details className="mt-4 border-t border-slate-100 pt-3">
+        <summary className="cursor-pointer select-none text-sm font-semibold text-sky-700">Personal, contact and payroll details</summary>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          <InfoPair label="Home address" value={emp.address || "-"} />
+          <InfoPair label="SSN" value={emp.ssnLast4 ? `***-**-${emp.ssnLast4}` : "Not on file"} />
+          <InfoPair label="Reminder email" value={emp.personalEmail || emp.email} />
+          <InfoPair label="Joining date" value={dateForDisplay(emp.joiningDate)} />
+          <InfoPair label="Leaving / valid-to" value={dateForDisplay(emp.leavingDate)} />
+          <InfoPair label="Annual gross" value={`$${annualGross.toLocaleString()}`} />
+          <InfoPair label="Monthly gross" value={`$${monthlyGross.toLocaleString()}`} />
+          <InfoPair label="Employee rate" value={employeeRate} />
+          <InfoPair label="Employee OT rate" value={emp.otRatePerHour ?? 0} />
+          <InfoPair label="Client / PO rate" value={emp.payType === "hourly" ? `Hourly: ${emp.clientPerHourRate ?? 0}` : `Daily: ${emp.clientPerDayRate ?? 0}`} />
+          <InfoPair label="Client / PO OT" value={emp.clientOtRatePerHour ?? 0} />
+          <InfoPair label="Access status" value={emp.status || "active"} />
+          {emp.revocationReason && <InfoPair label="Revocation reason" value={emp.revocationReason} />}
+        </div>
+      </details>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
         <button
           onClick={() => onEdit(emp)}
-          className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white"
+          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
         >
           Edit
         </button>
 
         <button
           onClick={() => onToggleStatus(emp)}
-          className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white"
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
         >
-          {emp.status === "active" ? "Deactivate" : "Activate"}
+          {emp.status === "active" ? "Revoke Access" : "Restore Access"}
         </button>
 
         <button
           onClick={() => onDelete(emp._id)}
-          className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white"
+          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
         >
           Delete
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -576,6 +625,17 @@ function EmployeeDesktopRow({ emp, onEdit, onToggleStatus, onDelete }) {
       <td className="px-4 py-4 align-top text-sm text-slate-700">
         <div className="min-w-[120px]">{emp.department || "-"}</div>
       </td>
+      <td className="px-4 py-4 align-top text-sm text-slate-700">
+        {emp.numberOfDependents ?? 0}
+      </td>
+
+      <td className="px-4 py-4 align-top text-sm text-slate-700 whitespace-nowrap">
+        {dateForDisplay(emp.joiningDate)}
+      </td>
+
+      <td className="px-4 py-4 align-top text-sm text-slate-700 whitespace-nowrap">
+        {dateForDisplay(emp.leavingDate)}
+      </td>
       <td className="px-4 py-4 text-sm text-slate-700">
   {emp.clientId?.clientName || "-"}
 </td>
@@ -587,10 +647,18 @@ function EmployeeDesktopRow({ emp, onEdit, onToggleStatus, onDelete }) {
       <td className="px-4 py-4 align-top text-sm text-slate-700">
         <div className="min-w-[120px]">
           <p className="font-medium text-slate-900">
-            {emp.payType === "hourly" ? emp.perHourRate ?? 0 : emp.perDayRate ?? 0}
+            {emp.payType === "hourly"
+              ? emp.perHourRate ?? 0
+              : Number(emp.annualGrossSalary || 0) > 0
+                ? Number(emp.monthlyGrossSalary || 0).toLocaleString()
+                : emp.perDayRate ?? 0}
           </p>
           <p className="text-xs text-slate-500">
-            {emp.payType === "hourly" ? "Employee / Hr" : "Employee / Day"}
+            {emp.payType === "hourly"
+              ? "Employee / Hr"
+              : Number(emp.annualGrossSalary || 0) > 0
+                ? "Monthly salary; daily rate auto-calculated"
+                : "Manual Employee / Day"}
           </p>
         </div>
       </td>
@@ -667,7 +735,7 @@ function EmployeeDesktopRow({ emp, onEdit, onToggleStatus, onDelete }) {
             onClick={() => onToggleStatus(emp)}
             className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white"
           >
-            {emp.status === "active" ? "Deactivate" : "Activate"}
+            {emp.status === "active" ? "Revoke Access" : "Restore Access"}
           </button>
 
           <button
@@ -689,18 +757,26 @@ export default function EmployeesPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [employeeLoadError, setEmployeeLoadError] = useState("");
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [clients, setClients] = useState([]);
+  const [activeSection, setActiveSection] = useState("directory");
 
   const [form, setForm] = useState({
     name: "",
     email: "",
+    personalEmail: "",
+    address: "",
+    ssn: "",
     password: "",
     employeeId: "",
     designation: "",
     department: "",
+    joiningDate: "",
+    leavingDate: "",
     clientId: "",
     payType: "daily",
+    numberOfDependents: "0",
     perDayRate: "",
     perHourRate: "",
     otRatePerHour: "",
@@ -716,6 +792,7 @@ monthlyGrossSalary: "",
   async function loadEmployees() {
     try {
       setPageLoading(true);
+      setEmployeeLoadError("");
       const res = await fetch("/api/employees", { cache: "no-store" });
       const text = await res.text();
 
@@ -723,12 +800,20 @@ monthlyGrossSalary: "",
       try {
         data = text ? JSON.parse(text) : {};
       } catch {
-        data = {};
+        throw new Error(`Employee API returned an unexpected response (HTTP ${res.status}).`);
       }
 
-      setEmployees(data.employees || []);
+      if (!res.ok) {
+        throw new Error(data.error || `Could not load employees (HTTP ${res.status}).`);
+      }
+      if (!Array.isArray(data.employees)) {
+        throw new Error("Employee API response did not include an employee list.");
+      }
+
+      setEmployees(data.employees);
     } catch (error) {
       console.error("Load employees error:", error);
+      setEmployeeLoadError(error.message || "Could not load employees.");
     } finally {
       setPageLoading(false);
     }
@@ -765,14 +850,12 @@ monthlyGrossSalary: "",
     try {
       const payload = {
         ...form,
+        numberOfDependents: Number(form.numberOfDependents || 0),
         perDayRate:
-          form.payType === "daily" && form.perDayRate !== ""
-            ? Number(form.perDayRate)
+          form.payType === "daily" && Number(form.annualGrossSalary || 0) <= 0
+            ? Number(form.perDayRate || 0)
             : 0,
-        perHourRate:
-          form.payType === "hourly" && form.perHourRate !== ""
-            ? Number(form.perHourRate)
-            : 0,
+        perHourRate: Number(form.perHourRate || 0),
         otRatePerHour:
           form.otRatePerHour !== "" ? Number(form.otRatePerHour) : 0,
         clientPerDayRate:
@@ -815,12 +898,18 @@ monthlyGrossSalary: "",
       setForm({
         name: "",
         email: "",
+        personalEmail: "",
+        address: "",
+        ssn: "",
         password: "",
         employeeId: "",
         designation: "",
         department: "",
+        joiningDate: "",
+        leavingDate: "",
         clientId: "",
         payType: "daily",
+        numberOfDependents: "0",
         perDayRate: "",
         perHourRate: "",
         otRatePerHour: "",
@@ -951,7 +1040,7 @@ useEffect(() => {
     onMenuClick={() => setSidebarOpen(true)}
   />
 
-          <div className="mx-auto w-full max-w-[1900px] p-4 sm:p-6 space-y-6">
+          <div className="w-full p-3 sm:p-5 lg:p-7 space-y-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
@@ -962,14 +1051,9 @@ useEffect(() => {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200 w-full sm:w-auto sm:min-w-[140px]">
-                <p className="text-xs uppercase tracking-wide text-slate-400">
-                  Total Records
-                </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {employees.length}
-                </p>
-              </div>
+              <button type="button" onClick={() => setActiveSection("add")} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+                Add Employee
+              </button>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -978,9 +1062,18 @@ useEffect(() => {
               <StatCard title="Inactive Employees" value={inactiveEmployees} />
             </div>
 
+            <div className="flex w-full gap-2 rounded-2xl bg-slate-200/70 p-1.5 sm:w-fit" role="tablist" aria-label="Employee management sections">
+              {[{ id: "directory", label: "Employee Directory" }, { id: "add", label: "Add Employee" }].map((tab) => (
+                <button key={tab.id} type="button" role="tab" aria-selected={activeSection === tab.id} onClick={() => setActiveSection(tab.id)} className={`flex-1 rounded-xl px-5 py-2.5 text-sm font-semibold transition sm:flex-none ${activeSection === tab.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
          
 <div className="space-y-6">
 
+  {activeSection === "directory" && (
   <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200 min-w-0">
     <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div>
@@ -1003,10 +1096,16 @@ useEffect(() => {
       </div>
     </div>
 
-    <div className="block lg:hidden space-y-4">
+    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
       {pageLoading ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500">
           Loading employees...
+        </div>
+      ) : employeeLoadError ? (
+        <div className="col-span-full rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+          <p className="font-semibold">Employee list failed to load</p>
+          <p className="mt-1">{employeeLoadError}</p>
+          <button type="button" onClick={loadEmployees} className="mt-3 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800">Try again</button>
         </div>
       ) : filteredEmployees.length > 0 ? (
         filteredEmployees.map((emp) => (
@@ -1025,7 +1124,7 @@ useEffect(() => {
       )}
     </div>
 
-    <div className="hidden lg:block overflow-hidden rounded-2xl border border-slate-200">
+    <div className="hidden overflow-hidden rounded-2xl border border-slate-200">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-900 text-white">
@@ -1044,6 +1143,17 @@ useEffect(() => {
 
               <th className="px-4 py-4 text-left text-sm font-semibold">
                 Department
+              </th>
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Dependents
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Joining Date
+              </th>
+
+              <th className="px-4 py-4 text-left text-sm font-semibold">
+                Leaving / Valid-to
               </th>
 
               <th className="px-4 py-4 text-left text-sm font-semibold">
@@ -1096,7 +1206,7 @@ useEffect(() => {
             {pageLoading ? (
               <tr>
                 <td
-                  colSpan="12"
+                  colSpan="18"
                   className="px-4 py-10 text-center text-slate-500"
                 >
                   Loading employees...
@@ -1115,7 +1225,7 @@ useEffect(() => {
             ) : (
               <tr>
                 <td
-                  colSpan="12"
+                  colSpan="18"
                   className="px-4 py-10 text-center text-slate-500"
                 >
                   No employees found
@@ -1127,12 +1237,14 @@ useEffect(() => {
       </div>
     </div>
 
-    <p className="mt-3 hidden lg:block text-xs text-slate-400">
+    <p className="mt-3 hidden text-xs text-slate-400">
       Scroll horizontally to view all payroll and PO-related columns.
     </p>
   </div>
+  )}
 
-  <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
+  {activeSection === "add" && (
+  <div id="add-employee" className="scroll-mt-6 rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
     <div className="mb-5">
       <h2 className="text-xl font-semibold text-slate-900">
         Add New Employee
@@ -1144,6 +1256,7 @@ useEffect(() => {
     </div>
 
     <form onSubmit={createEmployee} className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Field label="Full Name">
         <Input
           type="text"
@@ -1161,6 +1274,11 @@ useEffect(() => {
           required
         />
       </Field>
+
+      <Field label="Personal Email (Reminders)">
+        <Input type="email" value={form.personalEmail} onChange={(e) => setForm({ ...form, personalEmail: e.target.value })} placeholder="Blank uses the account email" />
+      </Field>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Password">
@@ -1207,6 +1325,24 @@ useEffect(() => {
           />
         </Field>
 
+        <Field label="Number of Dependents">
+          <Input
+            type="number"
+            min="0"
+            step="1"
+            value={form.numberOfDependents}
+            onChange={(e) => setForm({ ...form, numberOfDependents: e.target.value })}
+          />
+        </Field>
+
+        <Field label="Joining Date">
+          <Input type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} />
+        </Field>
+
+        <Field label="Leaving / Valid-to Date">
+          <Input type="date" value={form.leavingDate} onChange={(e) => setForm({ ...form, leavingDate: e.target.value })} />
+        </Field>
+
         <Field label="Client">
           <Select
             value={form.clientId}
@@ -1227,6 +1363,18 @@ useEffect(() => {
         </Field>
       </div>
 
+      <SectionCard title="Personal and identity details" subtitle="Address is private. SSN is encrypted before saving and only its last four digits are displayed.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Home Address">
+            <textarea rows={3} maxLength={500} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100" placeholder="Street, city, state, ZIP" />
+          </Field>
+          <Field label="Social Security Number (SSN)">
+            <Input type="password" inputMode="numeric" autoComplete="off" maxLength={11} value={form.ssn} onChange={(e) => setForm({ ...form, ssn: e.target.value })} placeholder="Optional · enter 9 digits" />
+            <p className="mt-1 text-xs text-slate-500">Encrypted at rest. Only the last four digits are shown after saving.</p>
+          </Field>
+        </div>
+      </SectionCard>
+
       <SectionCard
         title="Employee Payroll Configuration"
         subtitle="Define employee payout rates used for salary calculation."
@@ -1236,26 +1384,7 @@ useEffect(() => {
             <Select
               value={form.payType}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  payType: e.target.value,
-                  perDayRate:
-                    e.target.value === "daily"
-                      ? form.perDayRate
-                      : "",
-                  perHourRate:
-                    e.target.value === "hourly"
-                      ? form.perHourRate
-                      : "",
-                  clientPerDayRate:
-                    e.target.value === "daily"
-                      ? form.clientPerDayRate
-                      : "",
-                  clientPerHourRate:
-                    e.target.value === "hourly"
-                      ? form.clientPerHourRate
-                      : "",
-                })
+                setForm({ ...form, payType: e.target.value })
               }
             >
               <option value="daily">Daily</option>
@@ -1303,8 +1432,14 @@ useEffect(() => {
             />
           </Field>
 
-          {form.payType === "daily" && (
+          {form.payType === "daily" && Number(form.annualGrossSalary || 0) > 0 && (
             <Field label="Employee Per Day Rate">
+              <Input value="Auto-calculated per payroll month" disabled />
+              <p className="mt-1 text-xs text-slate-500">Monthly gross is divided by that month’s working days. Weekday holidays are excluded.</p>
+            </Field>
+          )}
+          {form.payType === "daily" && Number(form.annualGrossSalary || 0) <= 0 && (
+          <Field label="Manual Employee Per Day Rate">
               <Input
                 type="number"
                 min="0"
@@ -1321,8 +1456,7 @@ useEffect(() => {
             </Field>
           )}
 
-          {form.payType === "hourly" && (
-            <Field label="Employee Per Hour Rate">
+          {form.payType === "hourly" && <Field label="Employee Per Hour Rate">
               <Input
                 type="number"
                 min="0"
@@ -1334,10 +1468,9 @@ useEffect(() => {
                     perHourRate: e.target.value,
                   })
                 }
-                required
+                required={form.payType === "hourly"}
               />
-            </Field>
-          )}
+            </Field>}
         </div>
       </SectionCard>
 
@@ -1432,6 +1565,7 @@ useEffect(() => {
       </button>
     </form>
   </div>
+  )}
 
 </div>
 

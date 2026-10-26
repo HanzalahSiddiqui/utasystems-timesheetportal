@@ -8,6 +8,16 @@ if (!MONGODB_URI) {
   throw new Error("MONGODB_URI is not defined");
 }
 
+// Respect the database in the connection URI so local and test environments
+// can use an isolated database. Keep the existing production database as the
+// fallback for deployments whose URI does not include a database name.
+const MONGODB_DB_NAME =
+  process.env.MONGODB_DB_NAME ||
+  (() => {
+    const databaseName = new URL(MONGODB_URI).pathname.split("/").filter(Boolean)[0];
+    return databaseName ? decodeURIComponent(databaseName) : "timesheet_portal";
+  })();
+
 let cached = global.mongoose;
 
 if (!cached) {
@@ -22,7 +32,7 @@ export async function connectDB() {
 
   if (!cached.promise) {
     cached.promise = mongoose.connect(MONGODB_URI, {
-      dbName: "timesheet_portal",
+      dbName: MONGODB_DB_NAME,
     });
   }
 

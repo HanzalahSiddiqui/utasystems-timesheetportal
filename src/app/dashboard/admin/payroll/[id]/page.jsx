@@ -40,6 +40,7 @@ export default function PayrollDetailPage() {
 
   const [form, setForm] = useState({
     allowances: "",
+    perDiemOtherIncome: "",
     deductions: "",
     remarks: "",
     status: "draft",
@@ -71,6 +72,7 @@ export default function PayrollDetailPage() {
       setItem(data.item);
       setForm({
         allowances: data.item.allowances ?? 0,
+        perDiemOtherIncome: data.item.perDiemOtherIncome ?? 0,
         deductions: data.item.deductions ?? 0,
         remarks: data.item.remarks ?? "",
         status: data.item.status ?? "draft",
@@ -103,6 +105,7 @@ export default function PayrollDetailPage() {
         },
         body: JSON.stringify({
           allowances: Number(form.allowances || 0),
+          perDiemOtherIncome: Number(form.perDiemOtherIncome || 0),
           deductions: Number(form.deductions || 0),
           remarks: form.remarks || "",
           status: form.status,
@@ -262,7 +265,11 @@ export default function PayrollDetailPage() {
                     </h2>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <InfoCard title="Present Days" value={item.presentDays} />
+                      <InfoCard title="Weekdays in Payroll Period" value={item.totalWeekdays ?? 0} />
+                      <InfoCard title="Working Days (after holidays)" value={item.workingDays ?? 0} />
+                      <InfoCard title="Holiday Weekdays" value={item.holidayWeekdays ?? 0} />
+                      <InfoCard title="Days Worked" value={item.presentDays} />
+                      <InfoCard title="Dependents" value={item.numberOfDependents ?? 0} />
                       <InfoCard title="Paid Leaves" value={item.paidLeaveDays} />
                       <InfoCard title="Unpaid Leaves" value={item.unpaidLeaveDays} />
                       <InfoCard title="Payable Days" value={item.payableDays} />
@@ -322,6 +329,7 @@ export default function PayrollDetailPage() {
                       <InfoCard title="PO OT Amount" value={item.poOtAmount} />
                       <InfoCard title="PO Amount" value={item.poAmount} />
                       <InfoCard title="Allowances" value={item.allowances} />
+                      <InfoCard title="Per Diem / Other Income" value={item.perDiemOtherIncome ?? 0} />
                       <InfoCard title="Deductions" value={item.deductions} />
                       <InfoCard title="Net Pay" value={item.netPay} />
                       <InfoCard title="Margin" value={item.margin} />
@@ -357,6 +365,19 @@ export default function PayrollDetailPage() {
                         />
                       </Field>
 
+                      <Field label="Per Diem / Other Income (this month)">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.perDiemOtherIncome}
+                          onChange={(e) =>
+                            setForm({ ...form, perDiemOtherIncome: e.target.value })
+                          }
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                        />
+                      </Field>
+
                       <Field label="Deductions">
                         <input
                           type="number"
@@ -369,6 +390,10 @@ export default function PayrollDetailPage() {
                           className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
                         />
                       </Field>
+
+                      <p className="text-xs text-slate-500">
+                        Per diem is shown as a separate accountant-facing line and is not included in current gross pay, net pay, employer tax, or profit calculations.
+                      </p>
 
                       <Field label="Status">
                         <select

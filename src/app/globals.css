@@ -110,6 +110,101 @@ textarea {
 .particle {
   animation: particleFloat 4s ease-in-out infinite;
 }
+
+@page payrollSummary {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  .payroll-summary-print {
+    page: payrollSummary;
+    width: 100% !important;
+    min-height: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .payroll-summary-print-layout,
+  .payroll-summary-print-content {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  .payroll-summary-print-main {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .payroll-summary-print-header,
+  .payroll-summary-print-card {
+    margin-bottom: 5mm !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 3mm !important;
+    padding: 5mm !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .payroll-summary-print-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 2mm !important;
+  }
+
+  .payroll-summary-print-metrics > div {
+    padding: 2.5mm !important;
+    break-inside: avoid;
+  }
+
+  .payroll-summary-print-table-wrap {
+    width: 100% !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+
+  .payroll-summary-print-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 8pt !important;
+  }
+
+  .payroll-summary-print-table th,
+  .payroll-summary-print-table td {
+    padding: 2mm !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+  }
+
+  .payroll-summary-print-table thead {
+    display: table-header-group;
+  }
+
+  .payroll-summary-print-table tr {
+    break-inside: avoid;
+  }
+
+  .payroll-summary-print-table th:nth-child(1),
+  .payroll-summary-print-table td:nth-child(1) { width: 16%; }
+  .payroll-summary-print-table th:nth-child(2),
+  .payroll-summary-print-table td:nth-child(2) { width: 12%; }
+  .payroll-summary-print-table th:nth-child(3),
+  .payroll-summary-print-table td:nth-child(3) { width: 14%; }
+  .payroll-summary-print-table th:nth-child(4),
+  .payroll-summary-print-table td:nth-child(4) { width: 14%; }
+  .payroll-summary-print-table th:nth-child(5),
+  .payroll-summary-print-table td:nth-child(5) { width: 16%; }
+  .payroll-summary-print-table th:nth-child(6),
+  .payroll-summary-print-table td:nth-child(6) { width: 16%; }
+  .payroll-summary-print-table th:nth-child(7),
+  .payroll-summary-print-table td:nth-child(7) { width: 12%; }
+}
+
 .no-print {
   display: block;
 }
