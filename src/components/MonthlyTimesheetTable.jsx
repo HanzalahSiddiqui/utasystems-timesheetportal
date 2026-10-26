@@ -39,6 +39,7 @@ export default function MonthlyTimesheetTable({
   locked = false,
   status = "not-submitted",
   existingEntries = [],
+  employeeId = "",
 }) {
   const monthDates = useMemo(() => getMonthDates(month), [month]);
   const [rows, setRows] = useState([]);
@@ -47,22 +48,42 @@ export default function MonthlyTimesheetTable({
   const [rangeLeaveType, setRangeLeaveType] = useState("");
 const [rangeStartDate, setRangeStartDate] = useState("");
 const [rangeEndDate, setRangeEndDate] = useState("");
+  const [hasLocalDraft, setHasLocalDraft] = useState(false);
+
+  const localDraftKey = employeeId && month
+    ? `uta-timesheet-unsaved-v1:${employeeId}:${month}`
+    : "";
 
   useEffect(() => {
     const entryMap = new Map(existingEntries.map((e) => [e.date, e]));
     const holidayMap = new Map(holidays.map((h) => [h.date, h.title]));
+    let localEntries = new Map();
+
+    if (localDraftKey && !locked) {
+      try {
+        const savedDraft = JSON.parse(window.localStorage.getItem(localDraftKey) || "null");
+        if (Array.isArray(savedDraft?.entries)) {
+          localEntries = new Map(savedDraft.entries.map((entry) => [entry.date, entry]));
+        }
+      } catch {
+        window.localStorage.removeItem(localDraftKey);
+      }
+    } else if (localDraftKey && locked) {
+      window.localStorage.removeItem(localDraftKey);
+    }
 
     const generated = monthDates.map((item) => {
       const existing = entryMap.get(item.iso);
+      const local = localEntries.get(item.iso);
       const holidayTitle = holidayMap.get(item.iso) || "";
       const isHoliday = !!holidayTitle;
 
       return {
         date: item.iso,
         dayName: item.dayName,
-        regularHours: existing ? String(existing.regularHours || "") : "",
-        otHours: existing ? String(existing.otHours || "") : "",
-        leaveType: isHoliday ? "" : existing?.leaveType || "",
+        regularHours: local ? String(local.regularHours ?? "") : existing ? String(existing.regularHours || "") : "",
+        otHours: local ? String(local.otHours ?? "") : existing ? String(existing.otHours || "") : "",
+        leaveType: isHoliday ? "" : local?.leaveType || existing?.leaveType || "",
         isHoliday,
         holidayTitle,
         isWeekend: item.isWeekend,
@@ -70,7 +91,26 @@ const [rangeEndDate, setRangeEndDate] = useState("");
     });
 
     setRows(generated);
-  }, [monthDates, holidays, existingEntries]);
+    setHasLocalDraft(localEntries.size > 0);
+  }, [monthDates, holidays, existingEntries, localDraftKey, locked]);
+
+  function preserveLocalDraft(nextRows) {
+    if (!localDraftKey || locked) return;
+    try {
+      window.localStorage.setItem(localDraftKey, JSON.stringify({
+        savedAt: new Date().toISOString(),
+        entries: nextRows.map((row) => ({
+          date: row.date,
+          regularHours: row.regularHours,
+          otHours: row.otHours,
+          leaveType: row.leaveType,
+        })),
+      }));
+      setHasLocalDraft(true);
+    } catch (error) {
+      console.warn("Could not preserve local timesheet draft:", error);
+    }
+  }
 
   function handleChange(index, field, value) {
     if (locked) return;
@@ -99,6 +139,7 @@ const [rangeEndDate, setRangeEndDate] = useState("");
     }
 
     updated[index] = row;
+    preserveLocalDraft(updated);
     setRows(updated);
   }
 
@@ -166,6 +207,7 @@ const [rangeEndDate, setRangeEndDate] = useState("");
   return row;
 });
 
+  preserveLocalDraft(updated);
   setRows(updated);
 }
   async function saveTimesheet(submit = false) {
@@ -210,7 +252,9 @@ const [rangeEndDate, setRangeEndDate] = useState("");
 
       setMessage(data.message || "Saved successfully");
       setSaving(false);
-      window.location.reload();
+      if (localDraftKey) window.localStorage.removeItem(localDraftKey);
+      setHasLocalDraft(false);
+      if (submit) window.location.reload();
     } catch (error) {
       setMessage("Something went wrong");
       setSaving(false);
@@ -285,6 +329,11 @@ const [rangeEndDate, setRangeEndDate] = useState("");
       </div>
 
       {message && <div className="px-4 py-3 text-sm">{message}</div>}
+      {hasLocalDraft && !locked && (
+        <div className="px-4 py-3 border-b bg-amber-50 text-sm text-amber-800">
+          Your unsaved changes are preserved in this browser. Click Save Draft to save them to your account.
+        </div>
+      )}
       <div className="px-4 py-3 bg-slate-50 border-b text-sm">
   {/* <div className="font-semibold mb-2">Leave Legend</div> */}
 

@@ -100,6 +100,7 @@ export default function GetTimesheetPage() {
               locked={isLocked}
               status={status}
               existingEntries={existingRecord?.entries || []}
+              employeeId={session?.user?.id}
             />
           )}
         </div>
