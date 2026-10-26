@@ -100,9 +100,13 @@ export async function POST(req) {
       const isHoliday = holidayMap.has(entry.date);
       const holidayTitle = holidayMap.get(entry.date) || "";
 
-      const regularHours = Number(entry.regularHours || 0);
-      const otHours = Number(entry.otHours || 0);
+      const regularHours = Number(entry.regularHours ?? 0);
+      const otHours = Number(entry.otHours ?? 0);
       const leaveType = entry.leaveType || "";
+
+      if (!Number.isFinite(regularHours) || regularHours < 0 || !Number.isFinite(otHours) || otHours < 0) {
+        throw new Error(`Hours must be valid non-negative numbers for ${entry.date}`);
+      }
 
       if (regularHours > 8) {
         throw new Error(`Regular hours cannot exceed 8 for ${entry.date}`);
@@ -115,12 +119,12 @@ export async function POST(req) {
       return {
         date: entry.date,
         dayName: entry.dayName,
-        regularHours: isHoliday ? 0 : regularHours,
-        otHours: isHoliday ? 0 : otHours,
+        regularHours,
+        otHours,
         leaveType: isHoliday ? "" : leaveType,
         isHoliday,
         holidayTitle,
-        total: isHoliday ? 0 : regularHours + otHours,
+        total: regularHours + otHours,
       };
     });
 

@@ -20,11 +20,14 @@ function summarizeEntries(entries = [], holidayDates = new Set()) {
   let otHours = 0;
 
   for (const entry of entries) {
-    if (entry.isHoliday || holidayDates.has(entry.date)) continue;
-
     const regular = Number(entry.regularHours || 0);
     const ot = Number(entry.otHours || 0);
     const leave = entry.leaveType || "";
+    const isHoliday = entry.isHoliday || holidayDates.has(entry.date);
+
+    // A holiday with no hours stays a zero-work day. If an employee records
+    // hours on it, include that work in regular/OT payroll calculations.
+    if (isHoliday && regular === 0 && ot === 0) continue;
 
     if (regular > 0 || ot > 0) {
       presentDays += 1;

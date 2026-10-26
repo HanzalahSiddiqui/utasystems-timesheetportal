@@ -62,7 +62,7 @@ const [rangeEndDate, setRangeEndDate] = useState("");
         dayName: item.dayName,
         regularHours: existing ? String(existing.regularHours || "") : "",
         otHours: existing ? String(existing.otHours || "") : "",
-        leaveType: existing?.leaveType || "",
+        leaveType: isHoliday ? "" : existing?.leaveType || "",
         isHoliday,
         holidayTitle,
         isWeekend: item.isWeekend,
@@ -312,7 +312,7 @@ const [rangeEndDate, setRangeEndDate] = useState("");
           {rows.map((row, index) => {
             const hasHours = row.regularHours !== "" || row.otHours !== "";
             const hasLeave = row.leaveType !== "";
-            const disableInputs = locked || row.isHoliday;
+            const disableInputs = locked;
 
             return (
               <tr
@@ -361,7 +361,7 @@ const [rangeEndDate, setRangeEndDate] = useState("");
 
                 <td className="p-3">
                   <select
-                    disabled={disableInputs || hasHours}
+                    disabled={disableInputs || row.isHoliday || hasHours}
                     value={row.leaveType}
                     onChange={(e) =>
                       handleChange(index, "leaveType", e.target.value)
