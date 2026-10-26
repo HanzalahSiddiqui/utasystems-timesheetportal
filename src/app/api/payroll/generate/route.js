@@ -6,6 +6,7 @@ import { calculatePayrollFinancials } from "@/lib/payrollCalc";
 import Payroll from "@/models/Payroll";
 import Expense from "@/models/Expense";
 import Holiday from "@/models/Holiday";
+import { compensationForMonth } from "@/lib/compensationHistory";
 
 function round2(num) {
   return Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
@@ -93,13 +94,13 @@ function getCalendarSummary(month, holidays, user) {
   return { totalWeekdays, workingDays, holidayWeekdays, monthWorkingDays };
 }
 
-function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDates, existingPerDiem = 0) {
+function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDates, existing = null) {
   const summary = summarizeEntries(timesheet.entries || [], holidayDates);
+  const compensation = compensationForMonth(user, month, existing);
+  const payType = compensation.payType || "daily";
 
-  const payType = user.payType || "daily";
-
-  const monthlyGrossSalary = Number(user.monthlyGrossSalary || 0);
-  const annualGrossSalary = Number(user.annualGrossSalary || 0);
+  const monthlyGrossSalary = Number(compensation.monthlyGrossSalary || 0);
+  const annualGrossSalary = Number(compensation.annualGrossSalary || 0);
   const monthlySalaryBase = monthlyGrossSalary > 0
     ? monthlyGrossSalary
     : annualGrossSalary > 0
@@ -107,13 +108,13 @@ function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDate
       : 0;
   const perDayRate = payType === "daily" && monthlySalaryBase > 0 && calendar.monthWorkingDays > 0
     ? monthlySalaryBase / calendar.monthWorkingDays
-    : Number(user.perDayRate || 0);
-  const perHourRate = Number(user.perHourRate || 0);
-  const otRatePerHour = Number(user.otRatePerHour || 0);
+    : Number(compensation.perDayRate || 0);
+  const perHourRate = Number(compensation.perHourRate || 0);
+  const otRatePerHour = Number(compensation.otRatePerHour || 0);
 
-  const clientPerDayRate = Number(user.clientPerDayRate || 0);
-  const clientPerHourRate = Number(user.clientPerHourRate || 0);
-  const clientOtRatePerHour = Number(user.clientOtRatePerHour || 0);
+  const clientPerDayRate = Number(compensation.clientPerDayRate || 0);
+  const clientPerHourRate = Number(compensation.clientPerHourRate || 0);
+  const clientOtRatePerHour = Number(compensation.clientOtRatePerHour || 0);
 
   let payableDays = 0;
 
@@ -170,7 +171,7 @@ function buildPayrollFromTimesheet(user, timesheet, month, calendar, holidayDate
     totalWeekdays: calendar.totalWeekdays,
     workingDays: calendar.workingDays,
     holidayWeekdays: calendar.holidayWeekdays,
-    numberOfDependents: Number(user.numberOfDependents || 0),
+    numberOfDependents: Number(user.numberOfDependents || existing?.numberOfDependents || 0),
 
     presentDays: summary.presentDays,
     paidLeaveDays: summary.paidLeaveDays,
@@ -250,7 +251,7 @@ export async function POST(req) {
         month,
         calendar,
         new Set(holidays.map((holiday) => holiday.date)),
-        existing?.perDiemOtherIncome || 0
+        existing
       );
       // ---------- EXPENSE CALCULATION ----------
 

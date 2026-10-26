@@ -4,8 +4,9 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import Client from "@/models/Client";
-import { isValidDateOnly } from "@/lib/datePolicy";
+import { getBusinessDate, isValidDateOnly } from "@/lib/datePolicy";
 import { encryptSsn, normalizeSsn } from "@/lib/employeeSensitiveData";
+import { compensationSnapshot } from "@/lib/compensationHistory";
 export async function GET() {
   try {
   const session = await getServerSession(authOptions);
@@ -176,6 +177,17 @@ const monthlySalary =
   annualSalary > 0
     ? Number((annualSalary / 12).toFixed(2))
     : 0;
+    const initialCompensation = compensationSnapshot({
+      payType,
+      perDayRate: payType === "daily" && annualSalary === 0 ? perDayRate : 0,
+      perHourRate: payType === "hourly" ? perHourRate : 0,
+      otRatePerHour,
+      annualGrossSalary: annualSalary,
+      monthlyGrossSalary: monthlySalary,
+      clientPerDayRate: payType === "daily" ? clientPerDayRate : 0,
+      clientPerHourRate: payType === "hourly" ? clientPerHourRate : 0,
+      clientOtRatePerHour,
+    }, `${(joiningDate || getBusinessDate()).slice(0, 7)}-01`);
 
     const user = await User.create({
       name,
@@ -203,6 +215,7 @@ const monthlySalary =
       clientPerDayRate: payType === "daily" ? Number(clientPerDayRate || 0) : 0,
       clientPerHourRate: payType === "hourly" ? Number(clientPerHourRate || 0) : 0,
       clientOtRatePerHour: Number(clientOtRatePerHour || 0),
+      compensationHistory: [initialCompensation],
 
       payrollEnabled: payrollEnabled !== undefined ? !!payrollEnabled : true,
       annualGrossSalary: annualSalary,

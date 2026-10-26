@@ -2,10 +2,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import Payroll from "@/models/Payroll";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import { isValidDateOnly } from "@/lib/datePolicy";
+import { getBusinessDate, isValidDateOnly } from "@/lib/datePolicy";
 import { encryptSsn, normalizeSsn } from "@/lib/employeeSensitiveData";
+import {
+  compensationSnapshot,
+  hasCompensationChanged,
+  payrollSnapshotAsCompensation,
+} from "@/lib/compensationHistory";
 
 export async function PATCH(req, context) {
   try {
@@ -47,6 +53,7 @@ export async function PATCH(req, context) {
       joiningDate,
       leavingDate,
       revocationReason,
+      rateEffectiveFrom,
     } = body;
 
     if (joiningDate !== undefined && !isValidDateOnly(joiningDate)) {
@@ -54,6 +61,9 @@ export async function PATCH(req, context) {
     }
     if (leavingDate !== undefined && !isValidDateOnly(leavingDate)) {
       return Response.json({ error: "Leaving date must use YYYY-MM-DD format" }, { status: 400 });
+    }
+    if (rateEffectiveFrom !== undefined && !isValidDateOnly(rateEffectiveFrom)) {
+      return Response.json({ error: "Rate effective date must use YYYY-MM-DD format" }, { status: 400 });
     }
     const normalizedAddress = address === undefined ? undefined : String(address || "").trim();
     if (normalizedAddress !== undefined && normalizedAddress.length > 500) {
@@ -182,6 +192,76 @@ export async function PATCH(req, context) {
       );
     }
 
+    const nextCompensation = compensationSnapshot({
+      payType: nextPayType,
+      perDayRate: nextPayType === "daily"
+        ? (nextAnnualSalary > 0 ? 0 : (perDayRate !== undefined ? Number(perDayRate) : Number(employee.perDayRate || 0)))
+        : 0,
+      perHourRate: nextPayType === "hourly"
+        ? (perHourRate !== undefined ? Number(perHourRate) : Number(employee.perHourRate || 0))
+        : 0,
+      otRatePerHour: otRatePerHour !== undefined ? Number(otRatePerHour) : Number(employee.otRatePerHour || 0),
+      annualGrossSalary: nextAnnualSalary,
+      clientPerDayRate: clientPerDayRate !== undefined ? Number(clientPerDayRate) : Number(employee.clientPerDayRate || 0),
+      clientPerHourRate: clientPerHourRate !== undefined ? Number(clientPerHourRate) : Number(employee.clientPerHourRate || 0),
+      clientOtRatePerHour: clientOtRatePerHour !== undefined ? Number(clientOtRatePerHour) : Number(employee.clientOtRatePerHour || 0),
+    }, rateEffectiveFrom || "0001-01-01");
+    const compensationChanged = hasCompensationChanged(
+      compensationSnapshot(employee, "0001-01-01"),
+      nextCompensation
+    );
+    if (compensationChanged) {
+      if (!rateEffectiveFrom) {
+        return Response.json({ error: "Choose the first day of the month when the new rates take effect" }, { status: 400 });
+      }
+      if (!rateEffectiveFrom.endsWith("-01")) {
+        return Response.json({ error: "Rate changes must take effect on the first day of a month" }, { status: 400 });
+      }
+      const currentMonthStart = `${getBusinessDate().slice(0, 7)}-01`;
+      if (rateEffectiveFrom > currentMonthStart) {
+        return Response.json({ error: "Rate changes can be recorded for the current or a past payroll month" }, { status: 400 });
+      }
+    }
+
+    let compensationHistory = Array.isArray(employee.compensationHistory)
+      ? employee.compensationHistory.map((entry) => entry.toObject ? entry.toObject() : { ...entry })
+      : [];
+    let compensationToApply = nextCompensation;
+    if (compensationChanged) {
+      if (!compensationHistory.length) {
+        const historicalPayroll = await Payroll.find({
+          employeeId: employee._id,
+          month: { $lt: rateEffectiveFrom.slice(0, 7) },
+        }).sort({ month: 1 });
+        compensationHistory = historicalPayroll.map(payrollSnapshotAsCompensation);
+
+        const effectiveMonthDate = new Date(`${rateEffectiveFrom}T00:00:00.000Z`);
+        effectiveMonthDate.setUTCMonth(effectiveMonthDate.getUTCMonth() - 1);
+        const monthBeforeChange = `${effectiveMonthDate.toISOString().slice(0, 7)}-01`;
+        const baselineMonth = employee.joiningDate
+          ? `${employee.joiningDate.toISOString().slice(0, 7)}-01`
+          : historicalPayroll[0]?.month
+            ? `${historicalPayroll[0].month}-01`
+            : monthBeforeChange;
+        if (!compensationHistory.some((entry) => entry.effectiveFrom === baselineMonth)) {
+          compensationHistory.push(compensationSnapshot(employee, baselineMonth));
+        }
+      }
+
+      const nextVersion = compensationSnapshot(nextCompensation, rateEffectiveFrom);
+      compensationHistory = [
+        ...compensationHistory.filter((entry) => entry.effectiveFrom !== rateEffectiveFrom),
+        nextVersion,
+      ].sort((left, right) => left.effectiveFrom.localeCompare(right.effectiveFrom));
+
+      const currentMonthStart = `${getBusinessDate().slice(0, 7)}-01`;
+      const activeVersion = compensationHistory
+        .filter((entry) => entry.effectiveFrom <= currentMonthStart)
+        .at(-1);
+      if (activeVersion) compensationToApply = activeVersion;
+      employee.compensationHistory = compensationHistory;
+    }
+
     if (name !== undefined) employee.name = name;
     if (designation !== undefined) employee.designation = designation;
     if (department !== undefined) employee.department = department;
@@ -210,26 +290,16 @@ export async function PATCH(req, context) {
     }
     if (clientId !== undefined) employee.clientId = clientId || null;
 
-    if (payType !== undefined) employee.payType = payType;
     if (numberOfDependents !== undefined) employee.numberOfDependents = Number(numberOfDependents);
-    if (nextPayType === "daily") {
-      employee.perDayRate = nextAnnualSalary > 0
-        ? 0
-        : (perDayRate !== undefined ? Number(perDayRate) : Number(employee.perDayRate || 0));
-      employee.perHourRate = 0;
-    } else {
-      employee.perDayRate = 0;
-      if (perHourRate !== undefined) employee.perHourRate = Number(perHourRate);
-    }
-    if (otRatePerHour !== undefined) employee.otRatePerHour = Number(otRatePerHour);
-    employee.annualGrossSalary = nextAnnualSalary;
-    employee.monthlyGrossSalary = Number((nextAnnualSalary / 12).toFixed(2));
-
-    if (clientPerDayRate !== undefined) employee.clientPerDayRate = Number(clientPerDayRate);
-    if (clientPerHourRate !== undefined) employee.clientPerHourRate = Number(clientPerHourRate);
-    if (clientOtRatePerHour !== undefined) {
-      employee.clientOtRatePerHour = Number(clientOtRatePerHour);
-    }
+    employee.payType = compensationToApply.payType;
+    employee.perDayRate = compensationToApply.perDayRate;
+    employee.perHourRate = compensationToApply.perHourRate;
+    employee.otRatePerHour = compensationToApply.otRatePerHour;
+    employee.annualGrossSalary = compensationToApply.annualGrossSalary;
+    employee.monthlyGrossSalary = compensationToApply.monthlyGrossSalary;
+    employee.clientPerDayRate = compensationToApply.clientPerDayRate;
+    employee.clientPerHourRate = compensationToApply.clientPerHourRate;
+    employee.clientOtRatePerHour = compensationToApply.clientOtRatePerHour;
 
     if (payrollEnabled !== undefined) {
       employee.payrollEnabled = !!payrollEnabled;

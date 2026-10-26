@@ -107,6 +107,11 @@ function dateForInput(value) {
   return value ? new Date(value).toISOString().slice(0, 10) : "";
 }
 
+function firstDayOfCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 function dateForDisplay(value) {
   return value ? new Date(value).toLocaleDateString("en-US", { timeZone: "UTC" }) : "-";
 }
@@ -138,6 +143,7 @@ const [form, setForm] = useState({
   password: "",
   clientId: employee.clientId?._id || employee.clientId || "",
   payType: employee.payType || "daily",
+  rateEffectiveFrom: firstDayOfCurrentMonth(),
   numberOfDependents: employee.numberOfDependents ?? 0,
   perDayRate: employee.perDayRate ?? "",
   perHourRate: employee.perHourRate ?? "",
@@ -365,6 +371,15 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
               subtitle="Update payout rates used for employee salary calculation."
             >
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Field label="Rate Effective From">
+                  <Input
+                    type="date"
+                    value={form.rateEffectiveFrom}
+                    onChange={(e) => setForm({ ...form, rateEffectiveFrom: e.target.value })}
+                    required
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Choose the first day of a month. The selected rates apply to that month and later payrolls.</p>
+                </Field>
                 <Field label="Pay Type">
                   <Select
                     value={form.payType}
@@ -451,6 +466,30 @@ monthlyGrossSalary: employee.monthlyGrossSalary ?? "",
                     <span className="text-sm text-slate-700">Enable payroll</span>
                   </label>
                 </Field>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="text-sm font-semibold text-slate-800">Saved rate history</p>
+                {employee.compensationHistory?.length ? (
+                  <div className="mt-2 space-y-2">
+                    {[...employee.compensationHistory]
+                      .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
+                      .map((entry) => (
+                        <div key={entry.effectiveFrom} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-sm">
+                          <span className="font-medium text-slate-700">Effective {entry.effectiveFrom}</span>
+                          <span className="text-slate-600">
+                            {entry.payType === "hourly"
+                              ? `$${Number(entry.perHourRate || 0).toFixed(2)}/hr`
+                              : Number(entry.annualGrossSalary || 0) > 0
+                                ? `$${Number(entry.monthlyGrossSalary || 0).toFixed(2)}/month salary`
+                                : `$${Number(entry.perDayRate || 0).toFixed(2)}/day`}
+                            {Number(entry.annualGrossSalary || 0) > 0 ? ` · $${Number(entry.annualGrossSalary).toLocaleString()}/year` : ""}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">No rate changes have been recorded yet. Existing payroll records keep their saved rate snapshots.</p>
+                )}
               </div>
             </SectionCard>
           </div>

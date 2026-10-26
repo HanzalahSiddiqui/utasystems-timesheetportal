@@ -1,5 +1,21 @@
 import mongoose from "mongoose";
 
+const CompensationHistorySchema = new mongoose.Schema(
+  {
+    effectiveFrom: { type: String, required: true, match: /^\d{4}-\d{2}-01$/ },
+    payType: { type: String, enum: ["daily", "hourly"], required: true },
+    perDayRate: { type: Number, default: 0, min: 0 },
+    perHourRate: { type: Number, default: 0, min: 0 },
+    otRatePerHour: { type: Number, default: 0, min: 0 },
+    annualGrossSalary: { type: Number, default: 0, min: 0 },
+    monthlyGrossSalary: { type: Number, default: 0, min: 0 },
+    clientPerDayRate: { type: Number, default: 0, min: 0 },
+    clientPerHourRate: { type: Number, default: 0, min: 0 },
+    clientOtRatePerHour: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -175,6 +191,11 @@ const UserSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    compensationHistory: {
+      type: [CompensationHistorySchema],
+      default: [],
     },
 
     payrollEnabled: {
