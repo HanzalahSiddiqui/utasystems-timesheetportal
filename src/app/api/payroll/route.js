@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Payroll from "@/models/Payroll";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/email";
+import mongoose from "mongoose";
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -21,7 +22,7 @@ export async function POST(req) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { month, recipient, note = "" } = await req.json();
+    const { month, recipient, note = "", payrollIds } = await req.json();
     const email = String(recipient || "").trim();
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || "")) {
       return Response.json({ error: "Select a valid payroll month" }, { status: 400 });
@@ -32,9 +33,12 @@ export async function POST(req) {
     if (String(note).length > 4000) {
       return Response.json({ error: "Email note must be 4,000 characters or less" }, { status: 400 });
     }
+    if (!Array.isArray(payrollIds) || payrollIds.length === 0 || payrollIds.length > 1000 || payrollIds.some((id) => !mongoose.Types.ObjectId.isValid(String(id)))) {
+      return Response.json({ error: "Select at least one valid employee for the payroll summary" }, { status: 400 });
+    }
 
     await connectDB();
-    const payrollItems = await Payroll.find({ month }).sort({ employeeName: 1 });
+    const payrollItems = await Payroll.find({ month, _id: { $in: payrollIds } }).sort({ employeeName: 1 });
     if (!payrollItems.length) {
       return Response.json({ error: "Generate payroll for this month before emailing the accountant" }, { status: 400 });
     }
