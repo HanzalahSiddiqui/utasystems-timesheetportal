@@ -174,14 +174,14 @@ export default function AccountantPayrollDraftPage() {
               </div>
               <div className="payroll-summary-print-metrics grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <SummaryCard label="Employees included" value={includedRows.length} />
-                <SummaryCard label="Gross salary total" value={money(totals.grossSalary)} />
-                <SummaryCard label="Pro Rate Salary total" value={money(totals.proRateSalary)} accent />
+                <SummaryCard label="Offered salary total" value={money(totals.grossSalary)} />
+                <SummaryCard label="Gross Pro Rate Salary total" value={money(totals.proRateSalary)} accent />
                 <SummaryCard label="Per diem / other total" value={money(totals.perDiem)} />
               </div>
               <div className="payroll-summary-print-table-wrap overflow-x-auto rounded-2xl border border-slate-300">
                 <table className="payroll-summary-print-table w-full min-w-[1000px] border-collapse text-sm">
                   <thead className="bg-yellow-300 text-slate-950">
-                    <tr>{["Name", "Month", "Gross Salary", "Number of Days Worked", "Pro Rate Salary", "Per Diem/Other income", "Number of Dependents"].map((heading) => <th key={heading} className="border border-slate-400 px-4 py-3 text-left font-semibold">{heading}</th>)}</tr>
+                    <tr>{["Name", "Month", "Offered Salary", "Number of Days Worked", "Gross Pro Rate Salary", "Per Diem/Other income", "Number of Dependents"].map((heading) => <th key={heading} className="border border-slate-400 px-4 py-3 text-left font-semibold">{heading}</th>)}</tr>
                   </thead>
                   <tbody>
                     {includedRows.map((row) => <tr key={row.id} className="odd:bg-white even:bg-slate-50">
